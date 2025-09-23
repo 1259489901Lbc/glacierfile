@@ -1,0 +1,329 @@
+<!-- ==================== templates/about.html ==================== -->
+{% extends "base.html" %}
+
+{% block title %}关于我们 - AI角色扮演平台{% endblock %}
+
+{% block extra_css %}
+.about-section {
+    padding: 3rem 0;
+    color: white;
+}
+
+.about-content {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    padding: 3rem;
+    color: #333;
+}
+
+.content-section {
+    margin-bottom: 2rem;
+}
+
+.content-section h3 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.tech-item {
+    background: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: transform 0.3s ease;
+    border: 1px solid #e9ecef;
+    height: 100%;
+}
+
+.tech-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.user-group {
+    background: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    border: 1px solid #e9ecef;
+    height: 100%;
+}
+
+.user-group h5 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.contact-info p {
+    margin-bottom: 0.5rem;
+}
+
+.contact-info i {
+    color: var(--primary-color);
+    width: 20px;
+}
+
+.feature-highlight {
+    background: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    text-align: center;
+    border: 1px solid #e9ecef;
+    transition: transform 0.3s ease;
+}
+
+.feature-highlight:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+{% endblock %}
+
+{% block content %}
+<div class="about-section">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="about-content animate-fade-in">
+                    <h1 class="text-center mb-5">关于AI角色扮演平台</h1>
+
+                    <div class="content-section">
+                        <h3><i class="fas fa-lightbulb me-2"></i>项目愿景</h3>
+                        <p class="lead">我们致力于创建一个革命性的AI交互平台，让用户能够与历史人物、文学角色、动漫人物等进行深度对话，探索知识的边界，激发创造力和想象力。通过先进的AI技术，我们让每一次对话都成为一次独特的学习和娱乐体验。</p>
+                    </div>
+
+                    <div class="content-section">
+                        <h3><i class="fas fa-rocket me-2"></i>核心功能</h3>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <ul class="list-unstyled">
+                                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>智能角色对话系统</li>
+                                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>实时语音交互支持</li>
+                                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>个性化角色设定</li>
+                                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>智能搜索与筛选</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <ul class="list-unstyled">
+                                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>多样化角色类型</li>
+                                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>实时响应系统</li>
+                                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>跨平台兼容性</li>
+                                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>用户友好界面</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="content-section">
+                        <h3><i class="fas fa-cogs me-2"></i>技术架构</h3>
+                        <p>平台基于现代Web技术栈开发，采用Python Flask框架作为后端，集成了先进的自然语言处理技术和语音识别技术，提供流畅且智能的用户体验。所有前端资源都内联集成，确保部署简便和性能优化。</p>
+
+                        <div class="row mt-4">
+                            <div class="col-md-4 mb-3">
+                                <div class="tech-item">
+                                    <i class="fab fa-python fa-3x text-primary mb-3"></i>
+                                    <h6>Python Flask</h6>
+                                    <small class="text-muted">轻量级后端框架，提供RESTful API</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="tech-item">
+                                    <i class="fas fa-brain fa-3x text-success mb-3"></i>
+                                    <h6>AI模型集成</h6>
+                                    <small class="text-muted">支持多种大语言模型，提供智能对话</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="tech-item">
+                                    <i class="fas fa-microphone fa-3x text-warning mb-3"></i>
+                                    <h6>语音技术</h6>
+                                    <small class="text-muted">Web Speech API，实现语音交互</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="content-section">
+                        <h3><i class="fas fa-users me-2"></i>目标用户群体</h3>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="user-group">
+                                    <h5>📚 学习爱好者</h5>
+                                    <p>希望通过与历史人物对话来学习历史知识，深入了解不同时代的思想和文化，提升人文素养和批判性思维能力。</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="user-group">
+                                    <h5>🎭 娱乐用户</h5>
+                                    <p>喜欢动漫、小说、电影等文化作品，希望能够与自己喜爱的虚拟角色进行互动交流，获得沉浸式的娱乐体验。</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="user-group">
+                                    <h5>💡 创作者与作家</h5>
+                                    <p>需要灵感启发和创意激发的创作者，通过与不同角色的对话来获得新的创作想法和故事灵感。</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="user-group">
+                                    <h5>🔍 技术探索者</h5>
+                                    <p>对AI技术和人机交互感兴趣的用户，希望体验最新的人工智能对话技术和语音交互功能。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="content-section">
+                        <h3><i class="fas fa-star me-2"></i>项目特色亮点</h3>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <div class="feature-highlight">
+                                    <i class="fas fa-code fa-2x text-primary mb-3"></i>
+                                    <h6>简洁架构设计</h6>
+                                    <p class="small text-muted">所有CSS和JavaScript代码内联集成，无需管理外部静态文件，部署和维护极其简单。</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="feature-highlight">
+                                    <i class="fas fa-mobile-alt fa-2x text-success mb-3"></i>
+                                    <h6>全响应式设计</h6>
+                                    <p class="small text-muted">基于Bootstrap 5框架，完美适配桌面电脑、平板和手机等各种设备尺寸。</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="feature-highlight">
+                                    <i class="fas fa-plug fa-2x text-warning mb-3"></i>
+                                    <h6>高度可扩展性</h6>
+                                    <p class="small text-muted">模块化的代码架构，支持轻松添加新角色、新功能和新的AI模型集成。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="content-section">
+                        <h3><i class="fas fa-chart-line me-2"></i>技术优势</h3>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-server text-primary me-2"></i>后端技术</h6>
+                                <ul class="list-unstyled ps-3">
+                                    <li class="mb-1">• Python Flask轻量级框架</li>
+                                    <li class="mb-1">• RESTful API设计</li>
+                                    <li class="mb-1">• 模块化服务架构</li>
+                                    <li class="mb-1">• 支持多种AI模型集成</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-desktop text-success me-2"></i>前端技术</h6>
+                                <ul class="list-unstyled ps-3">
+                                    <li class="mb-1">• Bootstrap 5响应式框架</li>
+                                    <li class="mb-1">• 内联CSS和JavaScript</li>
+                                    <li class="mb-1">• Web Speech API语音功能</li>
+                                    <li class="mb-1">• 现代化用户界面设计</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="content-section">
+                        <h3><i class="fas fa-road me-2"></i>未来发展规划</h3>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-primary">短期目标（3-6个月）</h6>
+                                <ul class="list-unstyled ps-3">
+                                    <li class="mb-1">• 集成更多AI模型（GPT-4, Claude等）</li>
+                                    <li class="mb-1">• 添加用户注册和登录系统</li>
+                                    <li class="mb-1">• 实现聊天记录持久化存储</li>
+                                    <li class="mb-1">• 扩展角色库至50+个角色</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-success">长期目标（6-12个月）</h6>
+                                <ul class="list-unstyled ps-3">
+                                    <li class="mb-1">• 开发移动应用程序</li>
+                                    <li class="mb-1">• 支持用户自定义角色创建</li>
+                                    <li class="mb-1">• 实现多人角色扮演房间</li>
+                                    <li class="mb-1">• 添加角色情感和记忆系统</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="content-section">
+                        <h3><i class="fas fa-envelope me-2"></i>联系我们</h3>
+                        <p>如果您对我们的项目感兴趣，有任何问题、建议或合作意向，欢迎通过以下方式联系我们：</p>
+                        <div class="contact-info row">
+                            <div class="col-md-6">
+                                <p><i class="fas fa-envelope"></i> 邮箱：contact@ai-roleplay.com</p>
+                                <p><i class="fab fa-github"></i> GitHub：github.com/ai-roleplay</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><i class="fas fa-globe"></i> 官网：www.ai-roleplay.com</p>
+                                <p><i class="fab fa-twitter"></i> 微博：@AI角色扮演平台</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="content-section">
+                        <h3><i class="fas fa-heart me-2"></i>致谢</h3>
+                        <p>感谢所有支持和使用我们平台的用户，感谢开源社区提供的优秀工具和框架，让这个项目得以实现。我们将持续改进和完善，为用户提供更好的AI角色扮演体验。</p>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg me-3">
+                            <i class="fas fa-home me-2"></i>返回首页
+                        </a>
+                        <button class="btn btn-outline-primary btn-lg" onclick="shareProject()">
+                            <i class="fas fa-share me-2"></i>分享项目
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+function shareProject() {
+    const url = window.location.origin;
+    const title = 'AI角色扮演平台 - 与经典角色深度对话';
+    const text = '体验革命性的AI角色扮演平台，与哈利波特、苏格拉底等经典角色进行真实对话！';
+
+    if (navigator.share) {
+        navigator.share({
+            title: title,
+            text: text,
+            url: url
+        }).catch(console.error);
+    } else {
+        // 回退方案：复制链接
+        navigator.clipboard.writeText(url).then(() => {
+            showToast('项目链接已复制到剪贴板！', 'success');
+        }).catch(() => {
+            showToast('无法复制链接，请手动分享：' + url, 'info');
+        });
+    }
+}
+
+// 添加滚动动画效果
+document.addEventListener('DOMContentLoaded', function() {
+    const sections = document.querySelectorAll('.content-section');
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    });
+
+    sections.forEach(section => {
+        section.style.opacity = '0';
+        section.style.transform = 'translateY(30px)';
+        section.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(section);
+    });
+});
+{% endblock %}

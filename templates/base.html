@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI角色扮演平台{% endblock %}</title>
+
+    <!-- Bootstrap CSS CDN -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome CDN -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <!-- 内联CSS样式 -->
+    <style>
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+
+        .main-content {
+            min-height: calc(100vh - 200px);
+        }
+
+        .card {
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.6s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .float-item {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-light sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-robot me-2"></i>AI角色扮演
+            </a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="fas fa-home me-1"></i>首页
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('about') }}">
+                            <i class="fas fa-info-circle me-1"></i>关于
+                        </a>
+                    </li>
+                </ul>
+
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <button class="btn btn-outline-primary btn-sm" onclick="toggleSettings()">
+                            <i class="fas fa-cog me-1"></i>设置
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容 -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-dark text-light py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>AI角色扮演平台</h5>
+                    <p class="text-muted">与你喜爱的角色进行深度对话交流</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="text-muted">© 2024 AI角色扮演平台. 保留所有权利.</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 设置面板 -->
+    <div id="settingsPanel" class="position-fixed top-0 end-0 h-100 bg-white shadow-lg" style="width: 350px; transform: translateX(100%); transition: transform 0.3s ease; z-index: 1050;">
+        <div class="p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5>设置</h5>
+                <button class="btn-close" onclick="toggleSettings()"></button>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">主题设置</label>
+                <select class="form-select" id="themeSelect" onchange="applyTheme()">
+                    <option value="auto">自动</option>
+                    <option value="light">浅色主题</option>
+                    <option value="dark">深色主题</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="enableVoice" checked>
+                    <label class="form-check-label" for="enableVoice">启用语音功能</label>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="enableAnimations" checked>
+                    <label class="form-check-label" for="enableAnimations">启用动画效果</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast容器 -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Bootstrap JS CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+    <!-- 内联JavaScript -->
+    <script>
+        // 全局变量
+        let settingsPanelOpen = false;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSettings();
+            initializeAnimations();
+        });
+
+        // 设置相关功能
+        function toggleSettings() {
+            const panel = document.getElementById('settingsPanel');
+            settingsPanelOpen = !settingsPanelOpen;
+
+            if (settingsPanelOpen) {
+                panel.style.transform = 'translateX(0)';
+            } else {
+                panel.style.transform = 'translateX(100%)';
+            }
+        }
+
+        function loadSettings() {
+            const theme = localStorage.getItem('theme') || 'auto';
+            const voiceEnabled = localStorage.getItem('voiceEnabled') !== 'false';
+            const animationsEnabled = localStorage.getItem('animationsEnabled') !== 'false';
+
+            document.getElementById('themeSelect').value = theme;
+            document.getElementById('enableVoice').checked = voiceEnabled;
+            document.getElementById('enableAnimations').checked = animationsEnabled;
+
+            applyTheme();
+        }
+
+        function applyTheme() {
+            const theme = document.getElementById('themeSelect').value;
+            const body = document.body;
+
+            localStorage.setItem('theme', theme);
+
+            body.classList.remove('theme-light', 'theme-dark');
+
+            if (theme === 'dark') {
+                body.classList.add('theme-dark');
+                body.style.background = 'linear-gradient(135deg, #2d3748 0%, #4a5568 100%)';
+            } else if (theme === 'light') {
+                body.classList.add('theme-light');
+                body.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            } else {
+                // 自动主题
+                body.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            }
+        }
+
+        function initializeAnimations() {
+            // 观察元素进入视口
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('animate-fade-in');
+                    }
+                });
+            });
+
+            document.querySelectorAll('.animate-on-scroll').forEach(el => {
+                observer.observe(el);
+            });
+        }
+
+        // 工具函数
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-white bg-${type} border-0`;
+            toast.setAttribute('role', 'alert');
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+
+            document.getElementById('toastContainer').appendChild(toast);
+
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+
+            toast.addEventListener('hidden.bs.toast', () => {
+                toast.remove();
+            });
+        }
+
+        // 保存设置
+        function saveSettings() {
+            const voiceEnabled = document.getElementById('enableVoice').checked;
+            const animationsEnabled = document.getElementById('enableAnimations').checked;
+
+            localStorage.setItem('voiceEnabled', voiceEnabled.toString());
+            localStorage.setItem('animationsEnabled', animationsEnabled.toString());
+
+            showToast('设置已保存', 'success');
+        }
+
+        // 监听设置变化
+        document.getElementById('enableVoice').addEventListener('change', saveSettings);
+        document.getElementById('enableAnimations').addEventListener('change', saveSettings);
+
+        {% block scripts %}{% endblock %}
+    </script>
+</body>
+</html>

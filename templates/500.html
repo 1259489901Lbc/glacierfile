@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}服务器错误 - AI角色扮演平台{% endblock %}
+
+{% block extra_css %}
+.error-page {
+    min-height: 60vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    text-align: center;
+}
+
+.error-content {
+    max-width: 600px;
+}
+
+.error-code {
+    font-size: 8rem;
+    font-weight: bold;
+    opacity: 0.8;
+    margin-bottom: 1rem;
+}
+
+.error-message {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+}
+{% endblock %}
+
+{% block content %}
+<div class="error-page">
+    <div class="error-content">
+        <div class="error-code">500</div>
+        <div class="error-message">服务器开小差了！</div>
+        <p class="lead mb-4">看起来我们的魔法出了点问题，请稍后再试...</p>
+        <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
+            <i class="fas fa-home me-2"></i>返回首页
+        </a>
+    </div>
+</div>
+{% endblock %}

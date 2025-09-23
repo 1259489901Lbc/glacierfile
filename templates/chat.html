@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ character.name }} - AI角色聊天</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .chat-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .chat-header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .character-info {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+        
+        .character-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 3px solid white;
+        }
+        
+        .chat-messages {
+            height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .message.user {
+            justify-content: flex-end;
+        }
+        
+        .message.assistant {
+            justify-content: flex-start;
+        }
+        
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+        }
+        
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .message.assistant .message-content {
+            background: white;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .voice-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 15px 20px;
+            padding: 15px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .voice-btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            user-select: none;
+        }
+
+        .record-btn {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            min-width: 140px;
+        }
+
+        .record-btn:hover:not(.recording):not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .record-btn.recording {
+            background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+            animation: pulse 1s infinite;
+            transform: scale(1.05);
+        }
+
+        .record-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .play-btn {
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+            color: white;
+            min-width: 100px;
+        }
+
+        .play-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.4);
+        }
+
+        .play-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .activate-btn {
+            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+            color: white;
+            min-width: 120px;
+            display: none;
+        }
+
+        .activate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(255, 152, 0, 0.4);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1.05); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1.05); }
+        }
+
+        .voice-status {
+            flex: 1;
+            font-size: 14px;
+            color: #666;
+            margin-left: 10px;
+            font-weight: 500;
+        }
+
+        .voice-status.recording {
+            color: #f44336;
+            font-weight: bold;
+        }
+
+        .voice-status.processing {
+            color: #ff9800;
+        }
+
+        .voice-status.error {
+            color: #f44336;
+        }
+
+        .voice-status.success {
+            color: #4CAF50;
+        }
+
+        .voice-status.speaking {
+            color: #2196F3;
+            font-weight: bold;
+        }
+
+        .voice-settings {
+            display: flex;
+            gap: 15px;
+            font-size: 12px;
+            align-items: center;
+        }
+
+        .voice-settings label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .chat-input {
+            padding: 20px;
+            border-top: 1px solid #e9ecef;
+            background: white;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            outline: none;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .message-input:focus {
+            border-color: #667eea;
+        }
+
+        .send-btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .send-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 10px 16px;
+            color: #666;
+            font-style: italic;
+        }
+
+        .debug-info {
+            font-size: 11px;
+            color: #999;
+            margin: 0 20px 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            font-family: monospace;
+            border: 1px solid #dee2e6;
+            max-height: 80px;
+            overflow-y: auto;
+        }
+
+        .browser-info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 12px;
+            margin: 15px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .activation-notice {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            margin: 15px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <!-- 聊天头部 -->
+        <div class="chat-header">
+            <div class="character-info">
+                <img src="{{ character.avatar }}" alt="{{ character.name }}" class="character-avatar">
+                <div>
+                    <h2 style="margin: 0;">{{ character.name }}</h2>
+                    <p style="margin: 5px 0 0 0; opacity: 0.9;">{{ character.description }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 浏览器兼容性提示 -->
+        <div class="browser-info" id="browserInfo" style="display: none;">
+        </div>
+
+        <!-- 激活提示 -->
+        <div class="activation-notice" id="activationNotice" style="display: none;">
+            <strong>🔊 语音功能需要激活</strong><br>
+            请点击下方的"激活语音"按钮以启用自动语音回复功能
+        </div>
+
+        <!-- 语音控制 -->
+        <div class="voice-controls">
+            <button id="activateBtn" class="voice-btn activate-btn">🔊 激活语音</button>
+            <button id="recordBtn" class="voice-btn record-btn">🎤 长按说话</button>
+            <button id="playBtn" class="voice-btn play-btn" disabled>🔊 播放</button>
+            <div class="voice-status" id="voiceStatus">检查浏览器兼容性...</div>
+            <div class="voice-settings">
+                <label>
+                    <input type="checkbox" id="autoPlay" checked> 自动播放
+                </label>
+                <label>
+                    <input type="checkbox" id="voiceInput" checked> 语音输入
+                </label>
+                <select id="langSelect">
+                    <option value="zh-CN">中文</option>
+                    <option value="en-US">English</option>
+                    <option value="ja-JP">日本語</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 调试信息 -->
+        <div class="debug-info" id="debugInfo"></div>
+
+        <!-- 聊天消息区域 -->
+        <div class="chat-messages" id="chatMessages">
+            <!-- 消息将在这里动态显示 -->
+        </div>
+
+        <div class="typing-indicator" id="typingIndicator">
+            {{ character.name }} 正在输入...
+        </div>
+
+        <!-- 输入区域 -->
+        <div class="chat-input">
+            <div class="input-group">
+                <input
+                    type="text"
+                    id="messageInput"
+                    class="message-input"
+                    placeholder="输入消息或长按语音按钮说话..."
+                    maxlength="2000"
+                >
+                <button id="sendBtn" class="send-btn">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        const sessionId = '{{ session_id }}';
+        const characterId = '{{ character.id }}';
+        let voiceConfig = null;
+        let lastResponse = '';
+        let isRecording = false;
+        let recognition = null;
+        let synthesis = window.speechSynthesis;
+        let recordingStartTime = 0;
+        let mouseDownTimer = null;
+        let voiceActivated = false;
+        let currentUtterance = null;
+
+        // DOM元素
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const typingIndicator = document.getElementById('typingIndicator');
+        const recordBtn = document.getElementById('recordBtn');
+        const playBtn = document.getElementById('playBtn');
+        const activateBtn = document.getElementById('activateBtn');
+        const voiceStatus = document.getElementById('voiceStatus');
+        const autoPlay = document.getElementById('autoPlay');
+        const voiceInput = document.getElementById('voiceInput');
+        const langSelect = document.getElementById('langSelect');
+        const debugInfo = document.getElementById('debugInfo');
+        const browserInfo = document.getElementById('browserInfo');
+        const activationNotice = document.getElementById('activationNotice');
+
+        // 调试信息输出
+        function updateDebug(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            debugInfo.innerHTML = logEntry + '<br>' + (debugInfo.innerHTML || '');
+            console.log(`[Voice Debug] ${message}`);
+
+            // 限制调试信息长度
+            const lines = debugInfo.innerHTML.split('<br>');
+            if (lines.length > 15) {
+                debugInfo.innerHTML = lines.slice(0, 15).join('<br>');
+            }
+        }
+
+        // 检查浏览器兼容性
+        function checkBrowserCompatibility() {
+            updateDebug('检查浏览器兼容性...');
+
+            const userAgent = navigator.userAgent;
+            const isChrome = userAgent.indexOf('Chrome') > -1;
+            const isFirefox = userAgent.indexOf('Firefox') > -1;
+            const isEdge = userAgent.indexOf('Edge') > -1;
+            const isSafari = userAgent.indexOf('Safari') > -1 && userAgent.indexOf('Chrome') === -1;
+
+            updateDebug(`浏览器: ${isChrome ? 'Chrome' : isFirefox ? 'Firefox' : isEdge ? 'Edge' : isSafari ? 'Safari' : '未知'}`);
+
+            // 检查必要的API支持
+            const hasGetUserMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+            const hasSpeechRecognition = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+            const hasSpeechSynthesis = !!window.speechSynthesis;
+            const isSecureContext = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+            updateDebug(`getUserMedia支持: ${hasGetUserMedia}`);
+            updateDebug(`语音识别支持: ${hasSpeechRecognition}`);
+            updateDebug(`语音合成支持: ${hasSpeechSynthesis}`);
+            updateDebug(`安全上下文: ${isSecureContext}`);
+
+            let browserMessage = '';
+            let canUseVoice = true;
+
+            if (!hasGetUserMedia) {
+                canUseVoice = false;
+                browserMessage = '您的浏览器不支持麦克风访问功能。建议使用最新版Chrome或Edge浏览器。';
+                updateDebug('浏览器不支持getUserMedia API');
+            } else if (!isSecureContext) {
+                canUseVoice = false;
+                browserMessage = '语音功能需要在安全环境下使用（HTTPS、localhost）。请确保网页地址以https://开头。';
+                updateDebug('非安全上下文，某些浏览器可能限制麦克风访问');
+            } else if (!hasSpeechRecognition) {
+                canUseVoice = false;
+                browserMessage = '您的浏览器不支持语音识别功能。建议使用Chrome浏览器以获得最佳体验。';
+                updateDebug('浏览器不支持语音识别API');
+            } else if (isSafari) {
+                browserMessage = 'Safari浏览器对语音功能支持有限，建议使用Chrome浏览器以获得更好体验。';
+                updateDebug('Safari浏览器，功能可能受限');
+            }
+
+            if (browserMessage) {
+                browserInfo.textContent = browserMessage;
+                browserInfo.style.display = 'block';
+            }
+
+            return canUseVoice;
+        }
+
+        // 激活语音功能
+        function activateVoiceFeatures() {
+            updateDebug('激活语音功能...');
+
+            // 通过创建一个空的语音播放来激活音频上下文
+            const testUtterance = new SpeechSynthesisUtterance('');
+            testUtterance.volume = 0;
+            synthesis.speak(testUtterance);
+
+            voiceActivated = true;
+            activateBtn.style.display = 'none';
+            activationNotice.style.display = 'none';
+
+            voiceStatus.textContent = '语音功能已激活';
+            voiceStatus.classList.add('success');
+
+            updateDebug('语音功能激活成功');
+        }
+
+        // 兼容性更好的麦克风权限检查
+        async function checkMicrophonePermission() {
+            updateDebug('检查麦克风权限...');
+
+            try {
+                // 检查是否有navigator.mediaDevices
+                if (!navigator.mediaDevices) {
+                    updateDebug('navigator.mediaDevices 不可用');
+
+                    // 尝试旧版API
+                    if (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia) {
+                        updateDebug('使用旧版getUserMedia API');
+                        return await requestMicrophoneAccessLegacy();
+                    } else {
+                        updateDebug('没有可用的getUserMedia API');
+                        return false;
+                    }
+                }
+
+                // 检查是否有getUserMedia方法
+                if (!navigator.mediaDevices.getUserMedia) {
+                    updateDebug('navigator.mediaDevices.getUserMedia 不可用');
+                    return false;
+                }
+
+                // 现代浏览器权限检查
+                if (navigator.permissions) {
+                    const permission = await navigator.permissions.query({ name: 'microphone' });
+                    updateDebug(`权限状态: ${permission.state}`);
+
+                    if (permission.state === 'granted') {
+                        return true;
+                    } else if (permission.state === 'denied') {
+                        return false;
+                    }
+                }
+
+                // 直接尝试获取媒体访问
+                return await requestMicrophoneAccess();
+
+            } catch (error) {
+                updateDebug(`权限检查失败: ${error.name} - ${error.message}`);
+                return false;
+            }
+        }
+
+        // 现代API请求麦克风访问
+        async function requestMicrophoneAccess() {
+            updateDebug('请求麦克风访问 (现代API)...');
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+
+                updateDebug('麦克风访问成功');
+
+                // 立即停止流
+                stream.getTracks().forEach(track => track.stop());
+                return true;
+
+            } catch (error) {
+                updateDebug(`麦克风访问失败: ${error.name} - ${error.message}`);
+
+                if (error.name === 'NotAllowedError') {
+                    voiceStatus.textContent = '麦克风权限被拒绝';
+                    voiceStatus.classList.add('error');
+                } else if (error.name === 'NotFoundError') {
+                    voiceStatus.textContent = '未找到麦克风设备';
+                    voiceStatus.classList.add('error');
+                } else if (error.name === 'NotSupportedError') {
+                    voiceStatus.textContent = '浏览器不支持麦克风访问';
+                    voiceStatus.classList.add('error');
+                } else {
+                    voiceStatus.textContent = '麦克风访问失败';
+                    voiceStatus.classList.add('error');
+                }
+
+                return false;
+            }
+        }
+
+        // 旧版API请求麦克风访问
+        async function requestMicrophoneAccessLegacy() {
+            updateDebug('请求麦克风访问 (旧版API)...');
+
+            return new Promise((resolve) => {
+                const getUserMedia = navigator.getUserMedia ||
+                                  navigator.webkitGetUserMedia ||
+                                  navigator.mozGetUserMedia;
+
+                if (!getUserMedia) {
+                    updateDebug('没有可用的getUserMedia函数');
+                    resolve(false);
+                    return;
+                }
+
+                getUserMedia.call(navigator,
+                    { audio: true },
+                    function(stream) {
+                        updateDebug('麦克风访问成功 (旧版API)');
+                        stream.getTracks().forEach(track => track.stop());
+                        resolve(true);
+                    },
+                    function(error) {
+                        updateDebug(`麦克风访问失败 (旧版API): ${error.name}`);
+                        resolve(false);
+                    }
+                );
+            });
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', async function() {
+            updateDebug('页面加载完成，开始初始化...');
+
+            // 检查浏览器兼容性
+            const isCompatible = checkBrowserCompatibility();
+
+            if (!isCompatible) {
+                voiceStatus.textContent = '浏览器不支持语音功能';
+                voiceStatus.classList.add('error');
+                recordBtn.disabled = true;
+                updateDebug('浏览器兼容性检查失败，禁用语音功能');
+            } else {
+                // 显示激活提示
+                activationNotice.style.display = 'block';
+                activateBtn.style.display = 'inline-block';
+                voiceStatus.textContent = '需要激活语音功能';
+
+                // 检查权限
+                const hasPermission = await checkMicrophonePermission();
+
+                if (hasPermission) {
+                    initializeVoice();
+                } else {
+                    voiceStatus.textContent = '需要麦克风权限';
+                    voiceStatus.classList.add('error');
+                    recordBtn.disabled = true;
+                }
+            }
+
+            loadChatHistory();
+            initializeEventListeners();
+            loadVoiceConfig();
+        });
+
+        // 初始化语音功能
+        function initializeVoice() {
+            updateDebug('初始化语音功能...');
+
+            try {
+                recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = langSelect.value;
+                recognition.maxAlternatives = 1;
+
+                recognition.onstart = function() {
+                    updateDebug('语音识别开始');
+                    voiceStatus.textContent = '正在听取语音...';
+                    voiceStatus.classList.remove('error', 'success');
+                    voiceStatus.classList.add('recording');
+                };
+
+                recognition.onresult = function(event) {
+                    const transcript = event.results[0][0].transcript;
+                    const confidence = event.results[0][0].confidence;
+                    updateDebug(`识别结果: "${transcript}" (置信度: ${confidence.toFixed(2)})`);
+                    handleVoiceInput(transcript);
+                };
+
+                recognition.onerror = function(event) {
+                    updateDebug(`语音识别错误: ${event.error}`);
+                    voiceStatus.textContent = `识别错误: ${event.error}`;
+                    voiceStatus.classList.add('error');
+                    resetRecordingState();
+                };
+
+                recognition.onend = function() {
+                    updateDebug('语音识别结束');
+                    resetRecordingState();
+                };
+
+                if (voiceActivated) {
+                    voiceStatus.textContent = '语音功能准备就绪';
+                    voiceStatus.classList.remove('error');
+                    voiceStatus.classList.add('success');
+                } else {
+                    voiceStatus.textContent = '需要激活语音功能';
+                }
+
+                updateDebug('语音识别初始化成功');
+                recordBtn.disabled = !voiceInput.checked;
+
+            } catch (error) {
+                updateDebug(`语音识别初始化失败: ${error.message}`);
+                voiceStatus.textContent = '语音功能初始化失败';
+                voiceStatus.classList.add('error');
+                recordBtn.disabled = true;
+            }
+        }
+
+        // 初始化事件监听器
+        function initializeEventListeners() {
+            updateDebug('初始化事件监听器...');
+
+            // 激活按钮
+            activateBtn.addEventListener('click', activateVoiceFeatures);
+
+            // 发送按钮
+            sendBtn.addEventListener('click', sendMessage);
+
+            // 回车发送
+            messageInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+
+            // 录音按钮事件
+            recordBtn.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                updateDebug('鼠标按下录音按钮');
+                startRecordingWithDelay();
+            });
+
+            recordBtn.addEventListener('mouseup', function(e) {
+                e.preventDefault();
+                updateDebug('鼠标释放录音按钮');
+                stopRecording();
+            });
+
+            recordBtn.addEventListener('mouseleave', function(e) {
+                e.preventDefault();
+                updateDebug('鼠标离开录音按钮');
+                stopRecording();
+            });
+
+            // 播放按钮
+            playBtn.addEventListener('click', playLastResponse);
+
+            // 语言选择
+            langSelect.addEventListener('change', function() {
+                if (recognition) {
+                    recognition.lang = langSelect.value;
+                    updateDebug(`语言切换为: ${langSelect.value}`);
+                }
+            });
+
+            // 语音输入开关
+            voiceInput.addEventListener('change', function() {
+                if (this.checked && recognition) {
+                    recordBtn.disabled = false;
+                } else {
+                    recordBtn.disabled = true;
+                }
+                updateDebug(`语音输入${this.checked ? '启用' : '禁用'}`);
+            });
+
+            updateDebug('事件监听器初始化完成');
+        }
+
+        // 带延迟的录音开始
+        function startRecordingWithDelay() {
+            if (mouseDownTimer) {
+                clearTimeout(mouseDownTimer);
+            }
+
+            mouseDownTimer = setTimeout(() => {
+                if (!isRecording && recognition) {
+                    startRecording();
+                }
+            }, 150);
+        }
+
+        // 开始录音
+        function startRecording() {
+            if (isRecording || !voiceInput.checked || !recognition) {
+                updateDebug('录音开始被忽略');
+                return;
+            }
+
+            updateDebug('开始录音...');
+            isRecording = true;
+            recordingStartTime = Date.now();
+            recordBtn.textContent = '🔴 录音中...';
+            recordBtn.classList.add('recording');
+
+            try {
+                recognition.start();
+            } catch (error) {
+                updateDebug(`启动录音失败: ${error.message}`);
+                resetRecordingState();
+            }
+        }
+
+        // 停止录音
+        function stopRecording() {
+            if (mouseDownTimer) {
+                clearTimeout(mouseDownTimer);
+                mouseDownTimer = null;
+            }
+
+            if (!isRecording) {
+                return;
+            }
+
+            const recordingDuration = Date.now() - recordingStartTime;
+            updateDebug(`停止录音，持续时间: ${recordingDuration}ms`);
+
+            isRecording = false;
+
+            if (recognition) {
+                try {
+                    recognition.stop();
+                } catch (error) {
+                    updateDebug(`停止录音失败: ${error.message}`);
+                }
+            }
+
+            voiceStatus.textContent = '处理中...';
+            voiceStatus.classList.add('processing');
+        }
+
+        // 重置录音状态
+        function resetRecordingState() {
+            isRecording = false;
+            recordBtn.textContent = '🎤 长按说话';
+            recordBtn.classList.remove('recording');
+            voiceStatus.classList.remove('recording', 'processing', 'error');
+
+            if (recognition && voiceInput.checked && voiceActivated) {
+                voiceStatus.textContent = '准备就绪';
+                voiceStatus.classList.add('success');
+            } else if (!voiceActivated) {
+                voiceStatus.textContent = '需要激活语音功能';
+            } else {
+                voiceStatus.textContent = '语音功能未就绪';
+            }
+        }
+
+        // 处理语音输入
+        async function handleVoiceInput(transcript) {
+            updateDebug(`处理语音输入: "${transcript}"`);
+            voiceStatus.textContent = `识别到: ${transcript}`;
+            messageInput.value = transcript;
+
+            setTimeout(async () => {
+                await sendMessage();
+                setTimeout(resetRecordingState, 1000);
+            }, 500);
+        }
+
+        // 发送消息
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            displayMessage('user', message);
+            messageInput.value = '';
+            showTypingIndicator();
+
+            try {
+                const response = await fetch('/api/chat/voice', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        message: message,
+                        use_voice_response: true
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                hideTypingIndicator();
+                displayMessage('assistant', data.response);
+                lastResponse = data.response;
+
+                // 立即播放响应（如果已激活且自动播放开启）
+                if (autoPlay.checked && voiceActivated) {
+                    updateDebug('自动播放AI回复');
+                    speakText(data.response);
+                } else {
+                    playBtn.disabled = false;
+                    if (!voiceActivated) {
+                        updateDebug('语音未激活，无法自动播放');
+                    }
+                }
+
+            } catch (error) {
+                hideTypingIndicator();
+                displayMessage('assistant', '抱歉，出现了错误，请稍后再试。');
+                updateDebug(`发送消息失败: ${error.message}`);
+            }
+        }
+
+        // 显示消息
+        function displayMessage(sender, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            messageContent.textContent = content;
+
+            messageDiv.appendChild(messageContent);
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // 显示/隐藏输入指示器
+        function showTypingIndicator() {
+            typingIndicator.style.display = 'block';
+        }
+
+        function hideTypingIndicator() {
+            typingIndicator.style.display = 'none';
+        }
+
+        // 语音播放 - 改进版本
+        function speakText(text) {
+            updateDebug(`开始播放文本: "${text.substring(0, 50)}..."`);
+
+            // 停止当前播放
+            synthesis.cancel();
+
+            if (currentUtterance) {
+                currentUtterance = null;
+            }
+
+            currentUtterance = new SpeechSynthesisUtterance(text);
+
+            // 设置语音参数
+            currentUtterance.lang = langSelect.value;
+            currentUtterance.rate = 0.9;
+            currentUtterance.pitch = 1.0;
+            currentUtterance.volume = 1.0;
+
+            currentUtterance.onstart = function() {
+                updateDebug('语音播放开始');
+                voiceStatus.textContent = '正在播放回复...';
+                voiceStatus.classList.remove('error', 'success', 'recording', 'processing');
+                voiceStatus.classList.add('speaking');
+                playBtn.textContent = '⏹️ 停止';
+                playBtn.disabled = false;
+            };
+
+            currentUtterance.onend = function() {
+                updateDebug('语音播放结束');
+                voiceStatus.textContent = '播放完成';
+                voiceStatus.classList.remove('speaking');
+                voiceStatus.classList.add('success');
+                playBtn.textContent = '🔊 播放';
+                currentUtterance = null;
+
+                // 3秒后重置状态
+                setTimeout(() => {
+                    if (voiceActivated) {
+                        resetRecordingState();
+                    }
+                }, 3000);
+            };
+
+            currentUtterance.onerror = function(event) {
+                updateDebug(`语音播放错误: ${event.error}`);
+                voiceStatus.textContent = '播放失败';
+                voiceStatus.classList.remove('speaking');
+                voiceStatus.classList.add('error');
+                playBtn.textContent = '🔊 播放';
+                currentUtterance = null;
+            };
+
+            // 开始播放
+            try {
+                synthesis.speak(currentUtterance);
+                updateDebug('语音播放命令已发送');
+            } catch (error) {
+                updateDebug(`语音播放失败: ${error.message}`);
+                voiceStatus.textContent = '播放失败';
+                voiceStatus.classList.add('error');
+            }
+        }
+
+        // 播放最后回复
+        function playLastResponse() {
+            if (synthesis.speaking || currentUtterance) {
+                updateDebug('停止当前播放');
+                synthesis.cancel();
+                currentUtterance = null;
+                playBtn.textContent = '🔊 播放';
+                voiceStatus.textContent = '播放已停止';
+                voiceStatus.classList.remove('speaking');
+            } else if (lastResponse) {
+                updateDebug('播放最后回复');
+                speakText(lastResponse);
+            } else {
+                updateDebug('没有可播放的回复');
+                voiceStatus.textContent = '没有可播放的内容';
+            }
+        }
+
+        // 加载语音配置和聊天历史
+        async function loadVoiceConfig() {
+            try {
+                const response = await fetch(`/api/voice/config/${characterId}`);
+                const data = await response.json();
+                if (data.success) {
+                    voiceConfig = data.config;
+                    updateDebug('语音配置加载成功');
+                } else {
+                    updateDebug('语音配置加载失败');
+                }
+            } catch (error) {
+                updateDebug(`加载语音配置失败: ${error.message}`);
+            }
+        }
+
+        async function loadChatHistory() {
+            try {
+                const response = await fetch(`/api/chat/history/${sessionId}`);
+                const messages = await response.json();
+
+                messages.forEach(msg => {
+                    displayMessage(msg.sender_type, msg.content);
+                });
+
+                const lastAIMessage = messages.filter(m => m.sender_type === 'character').pop();
+                if (lastAIMessage) {
+                    lastResponse = lastAIMessage.content;
+                    playBtn.disabled = false;
+                }
+
+                updateDebug(`加载了${messages.length}条历史消息`);
+            } catch (error) {
+                updateDebug(`加载聊天历史失败: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

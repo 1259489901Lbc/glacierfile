@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}AI角色扮演 - 首页{% endblock %}
+
+{% block extra_css %}
+.hero-section {
+    padding: 100px 0;
+    color: white;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-content h1 {
+    font-size: 3.5rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.floating-elements {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+}
+
+.float-item {
+    position: absolute;
+    font-size: 3rem;
+    opacity: 0.7;
+}
+
+.float-item:nth-child(1) { top: 10%; left: 10%; animation-delay: 0s; }
+.float-item:nth-child(2) { top: 20%; right: 15%; animation-delay: 0.5s; }
+.float-item:nth-child(3) { bottom: 30%; left: 20%; animation-delay: 1s; }
+.float-item:nth-child(4) { bottom: 20%; right: 10%; animation-delay: 1.5s; }
+
+.search-section {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 3rem 0;
+}
+
+.search-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    padding: 2rem;
+}
+
+.character-card {
+    height: 100%;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.character-card .card-img-top {
+    height: 200px;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.character-card:hover .card-img-top {
+    transform: scale(1.1);
+}
+
+.category-btn {
+    border-radius: 25px;
+    margin: 0.25rem;
+    transition: all 0.3s ease;
+}
+
+.category-btn.active {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+.feature-card {
+    padding: 2rem;
+    text-align: center;
+    height: 100%;
+}
+
+.feature-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.character-skills .badge {
+    font-size: 0.75rem;
+}
+{% endblock %}
+
+{% block content %}
+<!-- 英雄区域 -->
+<section class="hero-section position-relative">
+    <div class="floating-elements">
+        <div class="float-item">🤖</div>
+        <div class="float-item">💬</div>
+        <div class="float-item">🎭</div>
+        <div class="float-item">✨</div>
+    </div>
+    
+    <div class="container position-relative">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="hero-content animate-fade-in">
+                    <h1>与AI角色深度对话</h1>
+                    <p class="lead mb-4">探索无限可能，与哈利波特、苏格拉底等经典角色进行真实互动</p>
+                    <div class="d-flex justify-content-center gap-3">
+                        <button class="btn btn-primary btn-lg" onclick="scrollToCharacters()">开始体验</button>
+                        <a href="{{ url_for('about') }}" class="btn btn-outline-light btn-lg">了解更多</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 搜索区域 -->
+<section class="search-section" id="characters">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="search-card animate-on-scroll">
+                    <h3 class="text-center mb-4">寻找你的专属角色</h3>
+                    
+                    <div class="search-box mb-4">
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" id="searchInput" class="form-control" 
+                                   placeholder="搜索角色名称、技能或类型..." 
+                                   oninput="filterCharacters()">
+                        </div>
+                    </div>
+                    
+                    <div class="category-filter text-center">
+                        <h6 class="mb-3">分类筛选：</h6>
+                        <button class="btn btn-outline-secondary category-btn active" 
+                                data-category="" onclick="filterByCategory(this, '')">全部</button>
+                        {% for category in categories %}
+                        <button class="btn btn-outline-secondary category-btn" 
+                                data-category="{{ category }}" 
+                                onclick="filterByCategory(this, '{{ category }}')">{{ category }}</button>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 角色展示区域 -->
+<section class="py-5">
+    <div class="container">
+        <div class="row" id="charactersGrid">
+            {% for character in characters %}
+            <div class="col-lg-4 col-md-6 mb-4 character-item animate-on-scroll" 
+                 data-category="{{ character.category }}" 
+                 data-name="{{ character.name|lower }}"
+                 data-description="{{ character.description|lower }}">
+                <div class="character-card card h-100">
+                    <img src="{{ character.avatar }}" alt="{{ character.name }}" class="card-img-top">
+                    
+                    <div class="card-body d-flex flex-column">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="card-title">{{ character.name }}</h5>
+                            <span class="badge bg-primary">{{ character.category }}</span>
+                        </div>
+                        
+                        <p class="card-text text-muted">{{ character.description }}</p>
+                        
+                        <div class="character-skills mb-3">
+                            <h6 class="small text-muted">专业技能：</h6>
+                            <div class="d-flex flex-wrap gap-1">
+                                {% for skill in character.skills[:3] %}
+                                <span class="badge bg-light text-dark">{{ skill }}</span>
+                                {% endfor %}
+                                {% if character.skills|length > 3 %}
+                                <span class="badge bg-secondary">+{{ character.skills|length - 3 }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="card-actions mt-auto">
+                            <a href="{{ url_for('character_detail', character_id=character.id) }}" 
+                               class="btn btn-outline-primary btn-sm me-2">详细介绍</a>
+                            <a href="{{ url_for('chat_page', character_id=character.id) }}" 
+                               class="btn btn-primary btn-sm">立即聊天</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div id="noResults" class="text-center py-5 text-white" style="display: none;">
+            <i class="fas fa-search fa-3x mb-3"></i>
+            <h4>没有找到匹配的角色</h4>
+            <p>尝试调整搜索关键词或筛选条件</p>
+        </div>
+    </div>
+</section>
+
+<!-- 特性展示 -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2>为什么选择我们</h2>
+            <p class="lead text-muted">体验前所未有的AI角色交互</p>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-4 mb-4">
+                <div class="feature-card card">
+                    <div class="card-body">
+                        <div class="feature-icon text-primary">
+                            <i class="fas fa-brain"></i>
+                        </div>
+                        <h4>智能对话</h4>
+                        <p class="text-muted">基于先进的AI技术，每个角色都有独特的个性和知识背景</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4 mb-4">
+                <div class="feature-card card">
+                    <div class="card-body">
+                        <div class="feature-icon text-success">
+                            <i class="fas fa-microphone"></i>
+                        </div>
+                        <h4>语音交互</h4>
+                        <p class="text-muted">支持语音输入和语音回复，让对话更加自然流畅</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4 mb-4">
+                <div class="feature-card card">
+                    <div class="card-body">
+                        <div class="feature-icon text-warning">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h4>丰富角色</h4>
+                        <p class="text-muted">从文学经典到历史人物，满足不同兴趣和学习需求</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+let currentCategory = '';
+
+function scrollToCharacters() {
+    document.getElementById('characters').scrollIntoView({ behavior: 'smooth' });
+}
+
+function filterByCategory(button, category) {
+    // 更新按钮状态
+    document.querySelectorAll('.category-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    button.classList.add('active');
+    
+    currentCategory = category;
+    filterCharacters();
+}
+
+function filterCharacters() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    let visibleCount = 0;
+    
+    document.querySelectorAll('.character-item').forEach(item => {
+        const name = item.dataset.name;
+        const description = item.dataset.description;
+        const category = item.dataset.category;
+        
+        const matchesSearch = !searchTerm || 
+                            name.includes(searchTerm) || 
+                            description.includes(searchTerm);
+        const matchesCategory = !currentCategory || category === currentCategory;
+        
+        if (matchesSearch && matchesCategory) {
+            item.style.display = 'block';
+            if (localStorage.getItem('animationsEnabled') !== 'false') {
+                item.classList.add('animate-fade-in');
+            }
+            visibleCount++;
+        } else {
+            item.style.display = 'none';
+            item.classList.remove('animate-fade-in');
+        }
+    });
+    
+    document.getElementById('noResults').style.display = visibleCount === 0 ? 'block' : 'none';
+}
+{% endblock %}

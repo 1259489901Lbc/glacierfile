@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}{{ character.name }} - 角色详情{% endblock %}
+
+{% block extra_css %}
+.character-detail-section {
+    padding: 3rem 0;
+}
+
+.character-info-card {
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+.character-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    padding: 2rem;
+    text-align: center;
+}
+
+.character-avatar {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    border: 5px solid rgba(255, 255, 255, 0.2);
+    object-fit: cover;
+    margin-bottom: 1rem;
+}
+
+.info-section {
+    margin-bottom: 1.5rem;
+}
+
+.info-section h5 {
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+.conversation-preview {
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+.chat-preview {
+    background: #f8f9fa;
+    padding: 2rem;
+    min-height: 400px;
+}
+
+.message {
+    margin-bottom: 1rem;
+}
+
+.message-bubble {
+    padding: 12px 16px;
+    border-radius: 18px;
+    max-width: 80%;
+    display: inline-block;
+}
+
+.ai-bubble {
+    background: white;
+    border: 1px solid #e9ecef;
+    color: #495057;
+    border-bottom-left-radius: 5px;
+}
+
+.user-bubble {
+    background: var(--primary-color);
+    color: white;
+    border-bottom-right-radius: 5px;
+    float: right;
+}
+
+.user-message {
+    text-align: right;
+    clear: both;
+}
+
+.typing-animation {
+    display: inline-flex;
+    align-items: center;
+    padding: 12px 16px;
+    background: white;
+    border-radius: 18px;
+    border-bottom-left-radius: 5px;
+    border: 1px solid #e9ecef;
+}
+
+.typing-animation span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #999;
+    margin: 0 2px;
+    animation: typing 1.4s infinite;
+}
+
+.typing-animation span:nth-child(2) { animation-delay: 0.2s; }
+.typing-animation span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typing {
+    0%, 60%, 100% {
+        transform: translateY(0);
+        opacity: 0.3;
+    }
+    30% {
+        transform: translateY(-10px);
+        opacity: 1;
+    }
+}
+
+.similar-card {
+    display: flex;
+    align-items: center;
+    background: white;
+    border-radius: 15px;
+    padding: 1rem;
+    transition: transform 0.3s ease;
+    text-decoration: none;
+    color: inherit;
+    border: 1px solid #e9ecef;
+}
+
+.similar-card:hover {
+    transform: translateY(-3px);
+    text-decoration: none;
+    color: inherit;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.similar-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 1rem;
+}
+{% endblock %}
+
+{% block content %}
+<div class="character-detail-section">
+    <div class="container">
+        <div class="row">
+            <!-- 角色信息 -->
+            <div class="col-lg-4 mb-4">
+                <div class="character-info-card card animate-fade-in">
+                    <div class="character-header">
+                        <img src="{{ character.avatar }}" alt="{{ character.name }}" class="character-avatar">
+                        <h2 class="mb-2">{{ character.name }}</h2>
+                        <span class="badge bg-light text-dark">{{ character.category }}</span>
+                    </div>
+                    
+                    <div class="card-body">
+                        <div class="info-section">
+                            <h5><i class="fas fa-user me-2"></i>角色描述</h5>
+                            <p class="text-muted">{{ character.description }}</p>
+                        </div>
+                        
+                        <div class="info-section">
+                            <h5><i class="fas fa-heart me-2"></i>性格特点</h5>
+                            <p class="text-muted">{{ character.personality }}</p>
+                        </div>
+                        
+                        <div class="info-section">
+                            <h5><i class="fas fa-book me-2"></i>背景故事</h5>
+                            <p class="text-muted">{{ character.background }}</p>
+                        </div>
+                        
+                        <div class="info-section">
+                            <h5><i class="fas fa-star me-2"></i>专业技能</h5>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for skill in character.skills %}
+                                <span class="badge bg-light text-dark">{{ skill }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <div class="action-buttons">
+                            <a href="{{ url_for('chat_page', character_id=character.id) }}" 
+                               class="btn btn-primary btn-lg w-100 mb-2">
+                                <i class="fas fa-comments me-2"></i>开始对话
+                            </a>
+                            <button class="btn btn-outline-secondary w-100" onclick="shareCharacter()">
+                                <i class="fas fa-share me-2"></i>分享角色
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 对话预览 -->
+            <div class="col-lg-8">
+                <div class="conversation-preview card animate-fade-in">
+                    <div class="card-header">
+                        <h4><i class="fas fa-eye me-2"></i>对话预览</h4>
+                        <p class="text-muted mb-0">看看与{{ character.name }}的对话会是什么样子</p>
+                    </div>
+                    
+                    <div class="chat-preview">
+                        <div class="message ai-message">
+                            <div class="d-flex align-items-start mb-3">
+                                <img src="{{ character.avatar }}" alt="{{ character.name }}" 
+                                     class="rounded-circle me-3" width="40" height="40">
+                                <div>
+                                    <div class="message-bubble ai-bubble">
+                                        {{ character.greeting }}
+                                    </div>
+                                    <small class="text-muted d-block">{{ character.name }} · 刚刚</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="message user-message">
+                            <div class="d-flex align-items-start mb-3 justify-content-end">
+                                <div class="me-3">
+                                    <div class="message-bubble user-bubble">
+                                        你好！很高兴认识你，能告诉我更多关于你的故事吗？
+                                    </div>
+                                    <small class="text-muted d-block text-end">你 · 刚刚</small>
+                                </div>
+                                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center text-white" 
+                                     style="width: 40px; height: 40px;">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="message ai-message" id="typingMessage">
+                            <div class="d-flex align-items-start mb-3">
+                                <img src="{{ character.avatar }}" alt="{{ character.name }}" 
+                                     class="rounded-circle me-3" width="40" height="40">
+                                <div class="typing-animation">
+                                    <span></span>
+                                    <span></span>
+                                    <span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-footer text-center">
+                        <p class="text-muted mb-3">想要继续这个对话吗？</p>
+                        <a href="{{ url_for('chat_page', character_id=character.id) }}" 
+                           class="btn btn-primary btn-lg">
+                            立即开始聊天
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 相似角色推荐 -->
+        {% if similar_characters %}
+        <div class="mt-5">
+            <h3 class="mb-4 text-white">你可能也喜欢</h3>
+            <div class="row">
+                {% for similar in similar_characters %}
+                <div class="col-md-4 mb-3">
+                    <a href="{{ url_for('character_detail', character_id=similar.id) }}" class="similar-card">
+                        <img src="{{ similar.avatar }}" alt="{{ similar.name }}" class="similar-avatar">
+                        <div class="similar-info flex-grow-1">
+                            <h6 class="mb-1">{{ similar.name }}</h6>
+                            <p class="small text-muted mb-0">{{ similar.description }}</p>
+                        </div>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+function shareCharacter() {
+    const url = window.location.href;
+    const title = '{{ character.name }} - AI角色扮演';
+    
+    if (navigator.share) {
+        navigator.share({
+            title: title,
+            url: url
+        }).catch(console.error);
+    } else {
+        navigator.clipboard.writeText(url).then(() => {
+            showToast('链接已复制到剪贴板！', 'success');
+        }).catch(() => {
+            showToast('无法复制链接，请手动复制地址栏内容', 'warning');
+        });
+    }
+}
+
+// 模拟打字效果结束后的回复
+setTimeout(() => {
+    const typingMessage = document.getElementById('typingMessage');
+    if (typingMessage) {
+        typingMessage.innerHTML = `
+            <div class="d-flex align-items-start mb-3">
+                <img src="{{ character.avatar }}" alt="{{ character.name }}" 
+                     class="rounded-circle me-3" width="40" height="40">
+                <div>
+                    <div class="message-bubble ai-bubble">
+                        很高兴遇到你！我有很多故事想与你分享，也很期待听到你的想法。
+                    </div>
+                    <small class="text-muted d-block">{{ character.name }} · 刚刚</small>
+                </div>
+            </div>
+        `;
+    }
+}, 3000);
+{% endblock %}
