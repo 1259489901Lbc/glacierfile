@@ -1,10 +1,12 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, abort, Response
+from flask_socketio import SocketIO, emit, join_room, leave_room
 import json
 import uuid
 from datetime import datetime
 import os
 from dotenv import load_dotenv
-
+import time
+import threading
 
 # 加载环境变量
 load_dotenv()
@@ -16,12 +18,18 @@ from config import Config
 app = Flask(__name__)
 app.config.from_object(Config)
 
+# 初始化SocketIO
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', ping_timeout=60, ping_interval=25)
+
 # 初始化服务
 character_repo = CharacterRepository()
 chat_repo = ChatRepository()
 ai_service = AIService()
 voice_service = VoiceService()
 chat_service = ChatService(ai_service)
+
+# 存储活跃的语音通话
+active_calls = {}
 
 # 确保上传目录存在
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -251,7 +259,8 @@ def system_status():
         },
         'stats': {
             'total_characters': len(character_repo.get_all()),
-            'active_sessions': chat_repo.get_active_session_count()
+            'active_sessions': chat_repo.get_active_session_count(),
+            'active_calls': len(active_calls)
         }
     })
 
@@ -317,6 +326,186 @@ def voice_chat():
         return jsonify({'error': '服务暂时不可用，请稍后再试'}), 503
 
 
+# WebSocket事件处理
+@socketio.on('connect')
+def handle_connect():
+    """处理WebSocket连接"""
+    print(f"Client connected: {request.sid}")
+    emit('connected', {'status': 'success'})
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """处理WebSocket断开"""
+    print(f"Client disconnected: {request.sid}")
+    # 清理可能存在的通话
+    if request.sid in active_calls:
+        call_info = active_calls.pop(request.sid)
+        leave_room(call_info['room'])
+        emit('call_ended', {'reason': 'disconnect'}, room=call_info['room'])
+
+
+@socketio.on('start_voice_call')
+def handle_start_voice_call(data):
+    """开始语音通话"""
+    session_id = data.get('session_id')
+    character_id = data.get('character_id')
+
+    app.logger.info(f"Starting voice call - Session: {session_id}, Character: {character_id}, Client: {request.sid}")
+
+    if not session_id or not character_id:
+        emit('error', {'message': '参数缺失'})
+        return
+
+    # 创建通话房间
+    room = f"call_{session_id}_{request.sid}"
+    join_room(room)
+
+    # 记录活跃通话
+    active_calls[request.sid] = {
+        'session_id': session_id,
+        'character_id': character_id,
+        'room': room,
+        'start_time': datetime.now(),
+        'status': 'active'
+    }
+
+    app.logger.info(f"Voice call started in room: {room}")
+
+    emit('call_started', {
+        'room': room,
+        'status': 'active'
+    })
+
+
+@socketio.on('end_voice_call')
+def handle_end_voice_call(data):
+    """结束语音通话"""
+    if request.sid in active_calls:
+        call_info = active_calls.pop(request.sid)
+        leave_room(call_info['room'])
+
+        # 计算通话时长
+        duration = (datetime.now() - call_info['start_time']).total_seconds()
+
+        emit('call_ended', {
+            'duration': duration,
+            'status': 'ended'
+        })
+
+
+@socketio.on('voice_stream')
+def handle_voice_stream(data):
+    """处理语音流数据"""
+    app.logger.info(f"Received voice stream from {request.sid}")
+
+    if request.sid not in active_calls:
+        app.logger.error(f"No active call for {request.sid}")
+        emit('error', {'message': '通话未开始'})
+        return
+
+    call_info = active_calls[request.sid]
+    transcript = data.get('transcript')
+    is_final = data.get('is_final', False)
+
+    app.logger.info(f"Voice stream - Transcript: '{transcript}', Final: {is_final}")
+
+    if transcript and is_final:
+        # 获取AI响应
+        session_id = call_info['session_id']
+        character_id = call_info['character_id']
+
+        app.logger.info(f"Processing final transcript: '{transcript}'")
+
+        # 立即发送正在处理的状态
+        emit('processing', {'status': 'thinking'}, room=call_info['room'])
+
+        # 保存客户端socket ID（重要！在线程中需要使用）
+        client_sid = request.sid
+
+        # 在新线程中处理AI响应（使用流式响应）
+        def process_ai_response_stream():
+            try:
+                app.logger.info(f"Processing voice call message: {transcript}")
+
+                # 先发送用户消息确认 - 直接发送到客户端，不使用room
+                socketio.emit('user_transcript_confirmed', {
+                    'transcript': transcript
+                }, to=client_sid)
+
+                # 获取角色
+                character = character_repo.get_by_id(character_id)
+                if not character:
+                    app.logger.error("Character not found")
+                    return
+
+                # 使用流式生成
+                full_response = ""
+                chunk_buffer = ""
+
+                app.logger.info("Starting stream generation...")
+
+                for chunk in chat_service.send_message_stream(session_id, transcript):
+                    full_response += chunk
+                    chunk_buffer += chunk
+
+                    # 每积累一定字符就发送 - 直接发送到客户端
+                    if len(chunk_buffer) >= 20 or '。' in chunk_buffer or '！' in chunk_buffer or '？' in chunk_buffer:
+                        app.logger.info(f"Sending chunk to {client_sid}: {chunk_buffer}")
+                        socketio.emit('ai_response_chunk', {
+                            'chunk': chunk_buffer,
+                            'is_complete': False
+                        }, to=client_sid)
+                        chunk_buffer = ""
+
+                # 发送剩余内容和完整响应 - 直接发送到客户端
+                if chunk_buffer:
+                    app.logger.info(f"Sending final chunk to {client_sid}: {chunk_buffer}")
+                    socketio.emit('ai_response_chunk', {
+                        'chunk': chunk_buffer,
+                        'is_complete': True
+                    }, to=client_sid)
+
+                app.logger.info(f"Sending complete response to {client_sid}: {full_response[:50]}...")
+
+                # 发送完整响应（用于语音播放）- 直接发送到客户端
+                socketio.emit('ai_response', {
+                    'text': full_response,
+                    'transcript': transcript
+                }, to=client_sid)
+
+                # 发送语音配置 - 直接发送到客户端
+                voice_config = voice_service.get_voice_settings_for_character(character)
+                socketio.emit('ai_voice_config', voice_config, to=client_sid)
+
+                app.logger.info(f"Voice call response sent successfully to {client_sid}")
+
+            except Exception as e:
+                app.logger.error(f"Voice call AI response error: {str(e)}")
+                import traceback
+                app.logger.error(traceback.format_exc())
+                socketio.emit('error', {'message': '处理响应时出错'}, to=client_sid)
+
+        # 启动新线程处理
+        threading.Thread(target=process_ai_response_stream).start()
+
+    # 转发实时转录
+    emit('voice_transcript', {
+        'transcript': transcript,
+        'is_final': is_final
+    }, room=call_info['room'])
+
+
+@socketio.on('update_call_status')
+def handle_update_call_status(data):
+    """更新通话状态"""
+    if request.sid in active_calls:
+        status = data.get('status')
+        if status:
+            active_calls[request.sid]['status'] = status
+            emit('call_status_updated', {'status': status})
+
+
 # 错误处理器
 @app.errorhandler(404)
 def not_found_error(error):
@@ -334,10 +523,11 @@ def internal_error(error):
 
 
 if __name__ == '__main__':
-    # 开发模式配置
-    app.run(
+    # 开发模式配置 - 使用SocketIO运行
+    socketio.run(
+        app,
         host='0.0.0.0',
         port=5000,
         debug=app.config['DEBUG'],
-        threaded=True
+        allow_unsafe_werkzeug=True  # 仅用于开发环境
     )
