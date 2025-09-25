@@ -436,7 +436,7 @@
                     📞 语音通话
                 </button>
                 <button id="endCallBtn" class="call-btn end-call" title="结束通话">
-                    📴 结束通话
+                    🔴 结束通话
                 </button>
             </div>
 
@@ -539,6 +539,11 @@
         let callDurationTimer = null;
         let continuousRecognition = null;
 
+        // 新增：句子队列相关
+        let sentenceQueue = [];
+        let isPlayingSentence = false;
+        let currentSentenceNumber = 0;
+
         // DOM元素
         const chatMessages = document.getElementById('chatMessages');
         const messageInput = document.getElementById('messageInput');
@@ -599,26 +604,51 @@
                 displayMessage('user', data.transcript);
             });
 
-            socket.on('ai_response_chunk', (data) => {
-                updateDebug(`收到AI响应片段: ${data.chunk}`);
-                // 可以在这里实现逐字显示效果
+            // 新增：处理句子级别的语音播放
+            socket.on('ai_sentence_ready', (data) => {
+                updateDebug(`收到句子 ${data.sentence_number}: ${data.sentence}`);
+
+                // 将句子加入队列
+                sentenceQueue.push({
+                    sentence: data.sentence,
+                    number: data.sentence_number,
+                    is_final: data.is_final
+                });
+
+                // 如果当前没有在播放，开始播放队列
+                if (!isPlayingSentence && isInCall && voiceActivated) {
+                    playNextSentence();
+                }
             });
 
-            socket.on('ai_response', (data) => {
-                updateDebug(`收到完整AI响应: ${data.text.substring(0, 50)}...`);
-                hideTypingIndicator();
+            socket.on('ai_response_chunk', (data) => {
+                updateDebug(`收到AI响应片段: ${data.chunk}`);
 
-                // 显示文字消息
-                displayMessage('assistant', data.text);
+                // 在通话中实时显示文本
+                if (isInCall) {
+                    // 如果是第一个片段，隐藏输入指示器
+                    if (currentSentenceNumber === 0) {
+                        hideTypingIndicator();
+                    }
+
+                    // 追加显示文本（使用特殊的流式显示方式）
+                    appendToLastAssistantMessage(data.chunk);
+                }
+            });
+
+            socket.on('ai_response_complete', (data) => {
+                updateDebug(`收到完整AI响应: ${data.text.substring(0, 50)}...`);
                 lastResponse = data.text;
 
-                // 在通话中自动播放响应
-                if (isInCall && voiceActivated) {
-                    updateDebug('通话中播放AI响应');
-                    // 直接播放，不停止语音识别
-                    speakText(data.text);
-                } else {
-                    updateDebug(`未播放语音 - isInCall: ${isInCall}, voiceActivated: ${voiceActivated}`);
+                // 如果不在通话中，才显示完整消息
+                if (!isInCall) {
+                    hideTypingIndicator();
+                    displayMessage('assistant', data.text);
+
+                    // 自动播放（如果设置了自动播放）
+                    if (autoPlay.checked && voiceActivated) {
+                        speakText(data.text);
+                    }
                 }
             });
 
@@ -637,22 +667,78 @@
                 voiceStatus.classList.add('error');
                 showCallNotification(`错误: ${data.message}`);
             });
-
-            // 监听所有事件（调试用）
-            socket.onAny((eventName, ...args) => {
-                updateDebug(`收到事件: ${eventName}`);
-                console.log(`WebSocket Event: ${eventName}`, args);
-            });
         }
 
-        // 专门用于通话期间的语音播放
-        function speakTextDuringCall(text) {
-            updateDebug(`通话期间播放语音: "${text.substring(0, 50)}..."`);
+        // 新增：追加文本到最后的助手消息
+        function appendToLastAssistantMessage(chunk) {
+            const messages = chatMessages.querySelectorAll('.message.assistant');
+            let lastAssistantMessage = messages[messages.length - 1];
+
+            // 如果没有助手消息或者需要创建新消息
+            if (!lastAssistantMessage || lastAssistantMessage.dataset.streaming !== 'true') {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message assistant';
+                messageDiv.dataset.streaming = 'true';
+
+                const messageContent = document.createElement('div');
+                messageContent.className = 'message-content';
+                messageContent.textContent = chunk;
+
+                messageDiv.appendChild(messageContent);
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            } else {
+                // 追加到现有消息
+                const messageContent = lastAssistantMessage.querySelector('.message-content');
+                messageContent.textContent += chunk;
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        }
+
+        // 新增：播放句子队列
+        function playNextSentence() {
+            if (sentenceQueue.length === 0 || !isInCall) {
+                isPlayingSentence = false;
+                currentSentenceNumber = 0;
+
+                // 重新启动语音识别
+                if (isInCall) {
+                    updateDebug('所有句子播放完成，重新启动语音识别');
+                    setTimeout(() => {
+                        if (isInCall) {
+                            startContinuousRecognition();
+                        }
+                    }, 500);
+                }
+                return;
+            }
+
+            isPlayingSentence = true;
+            const sentenceData = sentenceQueue.shift();
+            currentSentenceNumber = sentenceData.number;
+
+            updateDebug(`播放句子 ${sentenceData.number}: "${sentenceData.sentence}"`);
+
+            // 停止当前的语音识别
+            if (continuousRecognition) {
+                try {
+                    continuousRecognition.stop();
+                } catch (e) {
+                    updateDebug(`停止识别失败: ${e.message}`);
+                }
+            }
+
+            // 使用语音合成播放句子
+            speakSentenceDuringCall(sentenceData.sentence, sentenceData.is_final);
+        }
+
+        // 新增：专门用于通话期间的句子播放
+        function speakSentenceDuringCall(text, isFinal) {
+            updateDebug(`通话期间播放句子: "${text}"`);
 
             // 清除之前的所有语音
             synthesis.cancel();
 
-            // 创建新的语音
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = langSelect.value;
             utterance.rate = 0.9;
@@ -660,40 +746,51 @@
             utterance.volume = 1.0;
 
             utterance.onstart = function() {
-                updateDebug('AI语音播放开始（通话模式）');
+                updateDebug('句子播放开始');
                 voiceStatus.textContent = 'AI正在说话...';
                 voiceStatus.classList.add('speaking');
-
-                // 显示可视化
                 voiceVisualizer.classList.add('active');
             };
 
             utterance.onend = function() {
-                updateDebug('AI语音播放结束，重新启动语音识别');
-                voiceStatus.textContent = '正在听取...';
-                voiceStatus.classList.remove('speaking');
+                updateDebug('句子播放结束');
 
-                // 如果还在通话中，重新启动语音识别
-                if (isInCall) {
+                // 播放下一个句子
+                if (sentenceQueue.length > 0) {
                     setTimeout(() => {
-                        if (isInCall) {
-                            updateDebug('重新启动连续语音识别');
-                            startContinuousRecognition();
-                        }
-                    }, 300); // 短暂延迟避免音频冲突
+                        playNextSentence();
+                    }, 200); // 句子之间短暂停顿
+                } else {
+                    // 所有句子播放完成
+                    isPlayingSentence = false;
+                    voiceStatus.textContent = '正在听取...';
+                    voiceStatus.classList.remove('speaking');
+
+                    // 重新启动语音识别
+                    if (isInCall) {
+                        setTimeout(() => {
+                            if (isInCall) {
+                                updateDebug('重新启动连续语音识别');
+                                startContinuousRecognition();
+                            }
+                        }, 300);
+                    }
                 }
             };
 
             utterance.onerror = function(event) {
-                updateDebug(`语音播放错误: ${event.error}`);
+                updateDebug(`句子播放错误: ${event.error}`);
                 voiceStatus.textContent = '播放失败';
+                isPlayingSentence = false;
 
-                // 即使播放失败也要重启识别
-                if (isInCall) {
+                // 即使播放失败也要继续下一个句子
+                if (sentenceQueue.length > 0) {
                     setTimeout(() => {
-                        if (isInCall) {
-                            startContinuousRecognition();
-                        }
+                        playNextSentence();
+                    }, 200);
+                } else if (isInCall) {
+                    setTimeout(() => {
+                        startContinuousRecognition();
                     }, 300);
                 }
             };
@@ -701,11 +798,17 @@
             // 开始播放
             try {
                 synthesis.speak(utterance);
-                updateDebug('语音合成命令已发送');
+                updateDebug('句子合成命令已发送');
             } catch (error) {
-                updateDebug(`语音播放异常: ${error.message}`);
-                // 播放失败也要重启识别
-                if (isInCall) {
+                updateDebug(`句子播放异常: ${error.message}`);
+                isPlayingSentence = false;
+
+                // 播放失败也要处理队列
+                if (sentenceQueue.length > 0) {
+                    setTimeout(() => {
+                        playNextSentence();
+                    }, 200);
+                } else if (isInCall) {
                     setTimeout(() => {
                         startContinuousRecognition();
                     }, 300);
@@ -775,6 +878,11 @@
 
             isInCall = false;
 
+            // 清空句子队列
+            sentenceQueue = [];
+            isPlayingSentence = false;
+            currentSentenceNumber = 0;
+
             // 停止计时器
             if (callDurationTimer) {
                 clearInterval(callDurationTimer);
@@ -786,6 +894,11 @@
                 try {
                     continuousRecognition.stop();
                 } catch (e) {}
+            }
+
+            // 停止语音播放
+            if (synthesis.speaking) {
+                synthesis.cancel();
             }
 
             // 更新UI
@@ -827,6 +940,12 @@
         function startContinuousRecognition() {
             if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
                 updateDebug('浏览器不支持连续语音识别');
+                return;
+            }
+
+            // 如果正在播放句子，不启动识别
+            if (isPlayingSentence) {
+                updateDebug('正在播放语音，暂不启动识别');
                 return;
             }
 
@@ -886,10 +1005,12 @@
                     }
                 }
 
-                // 检测到用户开始说话，立即停止AI语音播放
-                if (hasNewSpeech && synthesis.speaking) {
+                // 检测到用户开始说话，立即停止AI语音播放和清空队列
+                if (hasNewSpeech && (synthesis.speaking || isPlayingSentence)) {
                     updateDebug('检测到用户说话，停止AI语音播放');
                     synthesis.cancel();
+                    sentenceQueue = []; // 清空句子队列
+                    isPlayingSentence = false;
                     voiceStatus.textContent = '正在听取...';
                     voiceStatus.classList.remove('speaking');
                 }
@@ -926,9 +1047,9 @@
                 }
 
                 // 自动重启识别
-                if (isInCall && event.error !== 'aborted') {
+                if (isInCall && event.error !== 'aborted' && !isPlayingSentence) {
                     setTimeout(() => {
-                        if (isInCall) {
+                        if (isInCall && !isPlayingSentence) {
                             try {
                                 continuousRecognition.start();
                                 updateDebug('自动重启语音识别');
@@ -943,10 +1064,10 @@
             continuousRecognition.onend = function() {
                 updateDebug('连续识别结束');
 
-                // 如果还在通话中，快速重启
-                if (isInCall) {
+                // 如果还在通话中且不在播放句子，快速重启
+                if (isInCall && !isPlayingSentence) {
                     setTimeout(() => {
-                        if (isInCall) {
+                        if (isInCall && !isPlayingSentence) {
                             try {
                                 continuousRecognition.start();
                                 updateDebug('重启连续识别');
