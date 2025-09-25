@@ -420,7 +420,7 @@ def handle_voice_stream(data):
         # 立即发送正在处理的状态
         emit('processing', {'status': 'thinking'}, room=call_info['room'])
 
-        # 保存客户端socket ID（重要！在线程中需要使用）
+        # 保存客户端socket ID
         client_sid = request.sid
 
         # 在新线程中处理AI响应（使用流式响应）
@@ -428,7 +428,7 @@ def handle_voice_stream(data):
             try:
                 app.logger.info(f"Processing voice call message: {transcript}")
 
-                # 先发送用户消息确认 - 直接发送到客户端，不使用room
+                # 先发送用户消息确认
                 socketio.emit('user_transcript_confirmed', {
                     'transcript': transcript
                 }, to=client_sid)
@@ -441,40 +441,71 @@ def handle_voice_stream(data):
 
                 # 使用流式生成
                 full_response = ""
-                chunk_buffer = ""
+                sentence_buffer = ""
+                sentence_count = 0
 
                 app.logger.info("Starting stream generation...")
 
                 for chunk in chat_service.send_message_stream(session_id, transcript):
                     full_response += chunk
-                    chunk_buffer += chunk
+                    sentence_buffer += chunk
 
-                    # 每积累一定字符就发送 - 直接发送到客户端
-                    if len(chunk_buffer) >= 20 or '。' in chunk_buffer or '！' in chunk_buffer or '？' in chunk_buffer:
-                        app.logger.info(f"Sending chunk to {client_sid}: {chunk_buffer}")
-                        socketio.emit('ai_response_chunk', {
-                            'chunk': chunk_buffer,
-                            'is_complete': False
-                        }, to=client_sid)
-                        chunk_buffer = ""
+                    # 检测句子结束（中文句号、问号、感叹号或英文句号）
+                    sentence_endings = ['。', '！', '？', '.', '!', '?']
 
-                # 发送剩余内容和完整响应 - 直接发送到客户端
-                if chunk_buffer:
-                    app.logger.info(f"Sending final chunk to {client_sid}: {chunk_buffer}")
+                    # 查找句子结束符
+                    for ending in sentence_endings:
+                        if ending in sentence_buffer:
+                            # 分割句子
+                            parts = sentence_buffer.split(ending, 1)
+                            if len(parts) > 1:
+                                complete_sentence = parts[0] + ending
+                                sentence_buffer = parts[1]
+
+                                # 发送完整的句子用于语音播放
+                                sentence_count += 1
+                                app.logger.info(f"Sending sentence {sentence_count}: {complete_sentence}")
+
+                                socketio.emit('ai_sentence_ready', {
+                                    'sentence': complete_sentence,
+                                    'sentence_number': sentence_count,
+                                    'is_final': False
+                                }, to=client_sid)
+
+                                # 同时发送文本片段用于显示
+                                socketio.emit('ai_response_chunk', {
+                                    'chunk': complete_sentence,
+                                    'is_complete': False
+                                }, to=client_sid)
+
+                                break
+
+                # 处理剩余的内容
+                if sentence_buffer.strip():
+                    sentence_count += 1
+                    app.logger.info(f"Sending final sentence {sentence_count}: {sentence_buffer}")
+
+                    socketio.emit('ai_sentence_ready', {
+                        'sentence': sentence_buffer,
+                        'sentence_number': sentence_count,
+                        'is_final': True
+                    }, to=client_sid)
+
                     socketio.emit('ai_response_chunk', {
-                        'chunk': chunk_buffer,
+                        'chunk': sentence_buffer,
                         'is_complete': True
                     }, to=client_sid)
 
+                # 发送完整响应（用于记录）
                 app.logger.info(f"Sending complete response to {client_sid}: {full_response[:50]}...")
 
-                # 发送完整响应（用于语音播放）- 直接发送到客户端
-                socketio.emit('ai_response', {
+                socketio.emit('ai_response_complete', {
                     'text': full_response,
-                    'transcript': transcript
+                    'transcript': transcript,
+                    'total_sentences': sentence_count
                 }, to=client_sid)
 
-                # 发送语音配置 - 直接发送到客户端
+                # 发送语音配置
                 voice_config = voice_service.get_voice_settings_for_character(character)
                 socketio.emit('ai_voice_config', voice_config, to=client_sid)
 
