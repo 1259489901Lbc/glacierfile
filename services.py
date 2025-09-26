@@ -45,39 +45,66 @@ class AIService:
         ]
 
     def generate_response(self, character: Character, user_message: str,
-                          conversation_history: List[Message] = None) -> str:
+                          conversation_history: List[Message] = None, is_voice_call: bool = False) -> str:
         """生成角色回复"""
         # 构建消息
-        messages = self._build_messages(character, user_message, conversation_history)
+        messages = self._build_messages(character, user_message, conversation_history, is_voice_call)
 
         try:
-            return self._call_openai_compatible(messages, character)
+            return self._call_openai_compatible(messages, character, is_voice_call)
         except Exception as e:
             logger.error(f"AI服务错误: {str(e)}")
             return self._generate_fallback_response(character, user_message)
 
     def generate_response_stream(self, character: Character, user_message: str,
-                                 conversation_history: List[Message] = None) -> Generator[str, None, None]:
+                                 conversation_history: List[Message] = None,
+                                 is_voice_call: bool = False) -> Generator[str, None, None]:
         """流式生成角色回复"""
-        messages = self._build_messages(character, user_message, conversation_history)
+        messages = self._build_messages(character, user_message, conversation_history, is_voice_call)
 
         try:
-            yield from self._stream_openai_compatible(messages, character)
+            yield from self._stream_openai_compatible(messages, character, is_voice_call)
         except Exception as e:
             logger.error(f"流式生成错误: {str(e)}")
             yield f"抱歉，我遇到了一些问题: {str(e)}"
 
     def _build_messages(self, character: Character, user_message: str,
-                        conversation_history: List[Message] = None) -> List[Dict[str, str]]:
+                        conversation_history: List[Message] = None,
+                        is_voice_call: bool = False) -> List[Dict[str, str]]:
         """构建API消息格式"""
+
+        # 获取基础系统提示
+        system_prompt = character.get_system_prompt()
+
+        # 如果是语音通话，添加额外指令
+        if is_voice_call:
+            voice_prompt = """
+
+【语音通话模式】
+你现在处于实时语音对话中，请：
+1. 回复要简洁自然，像日常口语交流
+2. 每次回复控制在1-3句话，最多不超过50个字
+3. 避免长篇大论和过多解释
+4. 使用简单直接的表达方式
+5. 回应要快速、自然、互动性强
+6. 多用口语化表达，少用书面语
+7. 适当使用语气词，让对话更自然
+"""
+            system_prompt += voice_prompt
+
         messages = [
-            {"role": "system", "content": character.get_system_prompt()}
+            {"role": "system", "content": system_prompt}
         ]
 
         # 添加历史消息
         if conversation_history:
             # 限制上下文长度
-            max_context = Config.MAX_CONVERSATION_LENGTH
+            if is_voice_call:
+                # 语音通话只保留最近3轮对话
+                max_context = 6
+            else:
+                max_context = Config.MAX_CONVERSATION_LENGTH
+
             recent_messages = conversation_history[-max_context:] if len(
                 conversation_history) > max_context else conversation_history
 
@@ -90,26 +117,40 @@ class AIService:
 
         return messages
 
-    def _call_openai_compatible(self, messages: List[Dict], character: Character) -> str:
+    def _call_openai_compatible(self, messages: List[Dict], character: Character,
+                                is_voice_call: bool = False) -> str:
         """调用OpenAI兼容API"""
         try:
-            logger.info(f"正在调用API，模型: {self.config['model']}")
+            logger.info(f"正在调用API，模型: {self.config['model']}，语音模式: {is_voice_call}")
 
             headers = {
                 "Authorization": f"Bearer {self.config['api_key']}",
                 "Content-Type": "application/json"
             }
 
-            data = {
-                "model": self.config['model'],
-                "messages": messages,
-                "temperature": max(0.0, min(1.0, self.config['temperature'] + character.temperature_modifier)),
-                "max_tokens": self.config['max_tokens'],
-                "top_p": self.config['top_p'],
-                "frequency_penalty": self.config.get('frequency_penalty', 0.0),
-                "presence_penalty": self.config.get('presence_penalty', 0.0),
-                "stream": False
-            }
+            # 根据是否是语音通话选择不同的参数
+            if is_voice_call:
+                data = {
+                    "model": self.config['model'],
+                    "messages": messages,
+                    "temperature": Config.VOICE_CALL_TEMPERATURE,
+                    "max_tokens": Config.VOICE_CALL_MAX_TOKENS,
+                    "top_p": 0.9,
+                    "frequency_penalty": Config.VOICE_CALL_FREQUENCY_PENALTY,
+                    "presence_penalty": 0.5,
+                    "stream": False
+                }
+            else:
+                data = {
+                    "model": self.config['model'],
+                    "messages": messages,
+                    "temperature": max(0.0, min(1.0, self.config['temperature'] + character.temperature_modifier)),
+                    "max_tokens": self.config['max_tokens'],
+                    "top_p": self.config['top_p'],
+                    "frequency_penalty": self.config.get('frequency_penalty', 0.0),
+                    "presence_penalty": self.config.get('presence_penalty', 0.0),
+                    "stream": False
+                }
 
             logger.info(f"请求URL: {self.config['api_base']}/chat/completions")
             logger.info(f"请求数据: {json.dumps(data, ensure_ascii=False, indent=2)}")
@@ -159,7 +200,8 @@ class AIService:
             logger.error(f"API调用失败: {str(e)}")
             raise
 
-    def _stream_openai_compatible(self, messages: List[Dict], character: Character) -> Generator[str, None, None]:
+    def _stream_openai_compatible(self, messages: List[Dict], character: Character,
+                                  is_voice_call: bool = False) -> Generator[str, None, None]:
         """OpenAI兼容API流式调用"""
         try:
             headers = {
@@ -167,13 +209,23 @@ class AIService:
                 "Content-Type": "application/json"
             }
 
-            data = {
-                "model": self.config['model'],
-                "messages": messages,
-                "temperature": max(0.0, min(1.0, self.config['temperature'] + character.temperature_modifier)),
-                "max_tokens": self.config['max_tokens'],
-                "stream": True
-            }
+            # 根据是否是语音通话选择不同的参数
+            if is_voice_call:
+                data = {
+                    "model": self.config['model'],
+                    "messages": messages,
+                    "temperature": Config.VOICE_CALL_TEMPERATURE,
+                    "max_tokens": Config.VOICE_CALL_MAX_TOKENS,
+                    "stream": True
+                }
+            else:
+                data = {
+                    "model": self.config['model'],
+                    "messages": messages,
+                    "temperature": max(0.0, min(1.0, self.config['temperature'] + character.temperature_modifier)),
+                    "max_tokens": self.config['max_tokens'],
+                    "stream": True
+                }
 
             response = requests.post(
                 f"{self.config['api_base']}/chat/completions",
@@ -230,7 +282,7 @@ class AIService:
                 f"基本的演绎法告诉我，'{user_message}'背后有更深的含义。"
             ],
             "confucius": [
-                f"子曰：关于'{user_message}'，吾当三思而后言。",
+                f"子曰：关于'{user_message}'，宜当三思而后言。",
                 f"'{user_message}'涉及到做人的道理，让我慢慢道来。",
                 f"这让我想起《论语》中的一段话，与'{user_message}'相关..."
             ]
@@ -365,7 +417,7 @@ class ChatService:
 
         return session
 
-    def send_message(self, session_id: str, user_message: str) -> Optional[str]:
+    def send_message(self, session_id: str, user_message: str, is_voice_call: bool = False) -> Optional[str]:
         """发送消息并获取回复"""
         session = self.chat_repo.get_session(session_id)
         if not session:
@@ -389,7 +441,7 @@ class ChatService:
         # 生成AI回复
         try:
             ai_response = self.ai_service.generate_response(
-                character, user_message, context_messages[:-1]  # 不包括刚添加的用户消息
+                character, user_message, context_messages[:-1], is_voice_call  # 不包括刚添加的用户消息
             )
 
             # 添加AI回复
@@ -398,7 +450,8 @@ class ChatService:
                 metadata={
                     'ai_generated': True,
                     'model': self.ai_service.current_model,
-                    'timestamp': datetime.now().isoformat()
+                    'timestamp': datetime.now().isoformat(),
+                    'is_voice_call': is_voice_call
                 }
             )
             session.add_message(ai_msg)
@@ -418,7 +471,8 @@ class ChatService:
 
             return error_msg
 
-    def send_message_stream(self, session_id: str, user_message: str) -> Generator[str, None, None]:
+    def send_message_stream(self, session_id: str, user_message: str, is_voice_call: bool = False) -> Generator[
+        str, None, None]:
         """流式发送消息"""
         session = self.chat_repo.get_session(session_id)
         if not session:
@@ -448,7 +502,7 @@ class ChatService:
         try:
             # 流式生成回复
             for chunk in self.ai_service.generate_response_stream(
-                    character, user_message, context_messages[:-1]
+                    character, user_message, context_messages[:-1], is_voice_call
             ):
                 full_response += chunk
                 yield chunk
@@ -460,7 +514,8 @@ class ChatService:
                     'ai_generated': True,
                     'model': self.ai_service.current_model,
                     'timestamp': datetime.now().isoformat(),
-                    'streamed': True
+                    'streamed': True,
+                    'is_voice_call': is_voice_call
                 }
             )
             session.add_message(ai_msg)
