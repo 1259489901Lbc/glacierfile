@@ -33,6 +33,11 @@ class Config:
     AI_FREQUENCY_PENALTY = float(os.environ.get('AI_FREQUENCY_PENALTY', '0.5'))
     AI_PRESENCE_PENALTY = float(os.environ.get('AI_PRESENCE_PENALTY', '0.5'))
 
+    # 语音通话专用配置
+    VOICE_CALL_TEMPERATURE = float(os.environ.get('VOICE_CALL_TEMPERATURE', '0.7'))
+    VOICE_CALL_MAX_TOKENS = int(os.environ.get('VOICE_CALL_MAX_TOKENS', '150'))  # 限制更短
+    VOICE_CALL_FREQUENCY_PENALTY = float(os.environ.get('VOICE_CALL_FREQUENCY_PENALTY', '0.8'))  # 避免重复
+
     # 语音服务配置
     VOICE_SERVICE_PROVIDER = os.environ.get('VOICE_SERVICE_PROVIDER', 'browser')
 
