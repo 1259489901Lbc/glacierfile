@@ -293,13 +293,15 @@ def voice_chat():
     session_id = data.get('session_id')
     message = data.get('message')
     use_voice_response = data.get('use_voice_response', False)
+    # 新增：检查是否来自语音通话
+    is_voice_call = data.get('is_voice_call', False)
 
     if not session_id or not message:
         return jsonify({'error': '参数缺失'}), 400
 
     try:
-        # 获取AI回复
-        response = chat_service.send_message(session_id, message)
+        # 获取AI回复 - 传递 is_voice_call 参数
+        response = chat_service.send_message(session_id, message, is_voice_call=is_voice_call)
 
         if response is None:
             return jsonify({'error': '会话不存在'}), 404
@@ -439,14 +441,15 @@ def handle_voice_stream(data):
                     app.logger.error("Character not found")
                     return
 
-                # 使用流式生成
+                # 使用流式生成 - 注意这里传递了 is_voice_call=True
                 full_response = ""
                 sentence_buffer = ""
                 sentence_count = 0
 
                 app.logger.info("Starting stream generation...")
 
-                for chunk in chat_service.send_message_stream(session_id, transcript):
+                # 关键修改：传递 is_voice_call=True
+                for chunk in chat_service.send_message_stream(session_id, transcript, is_voice_call=True):
                     full_response += chunk
                     sentence_buffer += chunk
 
@@ -525,6 +528,16 @@ def handle_voice_stream(data):
         'transcript': transcript,
         'is_final': is_final
     }, room=call_info['room'])
+
+
+@socketio.on('interrupt_ai_response')
+def handle_interrupt_ai_response(data):
+    """处理AI响应被打断"""
+    session_id = data.get('session_id')
+    app.logger.info(f"AI response interrupted for session {session_id}")
+
+    # 这里可以添加额外的清理逻辑
+    # 例如：停止正在进行的AI生成等
 
 
 @socketio.on('update_call_status')
