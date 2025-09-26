@@ -543,6 +543,7 @@
         let sentenceQueue = [];
         let isPlayingSentence = false;
         let currentSentenceNumber = 0;
+        let currentConversationRound = 0; // 新增：跟踪对话轮次
 
         // DOM元素
         const chatMessages = document.getElementById('chatMessages');
@@ -602,6 +603,8 @@
             socket.on('user_transcript_confirmed', (data) => {
                 updateDebug(`用户消息已确认: ${data.transcript}`);
                 displayMessage('user', data.transcript);
+                // 增加对话轮次
+                currentConversationRound++;
             });
 
             // 新增：处理句子级别的语音播放
@@ -632,7 +635,8 @@
                     }
 
                     // 追加显示文本（使用特殊的流式显示方式）
-                    appendToLastAssistantMessage(data.chunk);
+                    const isFirstChunk = currentSentenceNumber === 0;
+                    appendToLastAssistantMessage(data.chunk, isFirstChunk);
                 }
             });
 
@@ -670,15 +674,19 @@
         }
 
         // 新增：追加文本到最后的助手消息
-        function appendToLastAssistantMessage(chunk) {
+        function appendToLastAssistantMessage(chunk, isNewRound = false) {
             const messages = chatMessages.querySelectorAll('.message.assistant');
             let lastAssistantMessage = messages[messages.length - 1];
 
-            // 如果没有助手消息或者需要创建新消息
-            if (!lastAssistantMessage || lastAssistantMessage.dataset.streaming !== 'true') {
+            // 如果是新的对话轮次或没有正在streaming的消息，创建新消息
+            if (isNewRound || !lastAssistantMessage ||
+                lastAssistantMessage.dataset.streaming !== 'true' ||
+                lastAssistantMessage.dataset.round !== currentConversationRound.toString()) {
+
                 const messageDiv = document.createElement('div');
                 messageDiv.className = 'message assistant';
                 messageDiv.dataset.streaming = 'true';
+                messageDiv.dataset.round = currentConversationRound.toString();
 
                 const messageContent = document.createElement('div');
                 messageContent.className = 'message-content';
@@ -697,12 +705,13 @@
 
         // 新增：播放句子队列
         function playNextSentence() {
-            if (sentenceQueue.length === 0 || !isInCall) {
+            // 在播放前再次检查是否应该停止
+            if (!isInCall || synthesis.speaking || sentenceQueue.length === 0) {
                 isPlayingSentence = false;
                 currentSentenceNumber = 0;
 
                 // 重新启动语音识别
-                if (isInCall) {
+                if (isInCall && !synthesis.speaking) {
                     updateDebug('所有句子播放完成，重新启动语音识别');
                     setTimeout(() => {
                         if (isInCall) {
@@ -740,6 +749,8 @@
             synthesis.cancel();
 
             const utterance = new SpeechSynthesisUtterance(text);
+
+            // 设置语音参数
             utterance.lang = langSelect.value;
             utterance.rate = 0.9;
             utterance.pitch = 1.0;
@@ -969,6 +980,23 @@
 
                     if (transcript.trim().length > 0) {
                         hasNewSpeech = true;
+
+                        // 立即打断AI语音播放（更积极的打断策略）
+                        if (synthesis.speaking || isPlayingSentence || sentenceQueue.length > 0) {
+                            updateDebug('检测到用户说话，立即停止AI语音');
+                            synthesis.cancel();
+                            sentenceQueue = [];
+                            isPlayingSentence = false;
+                            currentSentenceNumber = 0;
+                            voiceStatus.textContent = '正在听取...';
+                            voiceStatus.classList.remove('speaking');
+                            voiceVisualizer.classList.add('active');
+
+                            // 发送打断信号给服务器
+                            socket.emit('interrupt_ai_response', {
+                                session_id: sessionId
+                            });
+                        }
                     }
 
                     if (event.results[i].isFinal) {
@@ -1003,16 +1031,6 @@
                             is_final: false
                         });
                     }
-                }
-
-                // 检测到用户开始说话，立即停止AI语音播放和清空队列
-                if (hasNewSpeech && (synthesis.speaking || isPlayingSentence)) {
-                    updateDebug('检测到用户说话，停止AI语音播放');
-                    synthesis.cancel();
-                    sentenceQueue = []; // 清空句子队列
-                    isPlayingSentence = false;
-                    voiceStatus.textContent = '正在听取...';
-                    voiceStatus.classList.remove('speaking');
                 }
 
                 // 静音检测
