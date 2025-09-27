@@ -15,7 +15,10 @@ from models import CharacterRepository, ChatRepository, ChatSession, Message
 from services import AIService, VoiceService, ChatService
 from config import Config
 
-app = Flask(__name__)
+# 创建Flask应用，明确指定静态文件配置
+app = Flask(__name__,
+            static_folder='static',
+            static_url_path='/static')
 app.config.from_object(Config)
 
 # 初始化SocketIO
@@ -31,8 +34,9 @@ chat_service = ChatService(ai_service)
 # 存储活跃的语音通话
 active_calls = {}
 
-# 确保上传目录存在
+# 确保必要目录存在
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs('static/images/characters', exist_ok=True)
 
 
 @app.route('/')
@@ -102,6 +106,226 @@ def about():
         'ai_models': ai_service.get_available_models()
     }
     return render_template('about.html', stats=stats)
+
+
+# 静态文件路由（确保静态文件可以正常访问）
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    """静态文件服务"""
+    return app.send_static_file(filename)
+
+
+# 调试路由
+@app.route('/debug/avatars')
+def debug_avatars():
+    """调试头像显示问题"""
+    import os
+
+    debug_info = {
+        'static_folder': app.static_folder,
+        'static_url_path': app.static_url_path,
+        'files_check': {}
+    }
+
+    characters = ['harry_potter', 'sherlock_holmes', 'confucius', 'marie_curie',
+                  'sun_wukong', 'einstein', 'mulan', 'elizabeth_bennet']
+
+    for char_id in characters:
+        file_path = f"static/images/characters/{char_id}.png"
+        debug_info['files_check'][char_id] = {
+            'expected_path': file_path,
+            'absolute_path': os.path.abspath(file_path),
+            'exists': os.path.exists(file_path),
+            'url': f"/static/images/characters/{char_id}.png"
+        }
+
+        if os.path.exists(file_path):
+            debug_info['files_check'][char_id]['size'] = os.path.getsize(file_path)
+
+    # 检查目录是否存在
+    debug_info['directories'] = {
+        'static': os.path.exists('static'),
+        'static/images': os.path.exists('static/images'),
+        'static/images/characters': os.path.exists('static/images/characters')
+    }
+
+    # 构建文件检查表格行
+    check_mark = '✓'
+    cross_mark = '✗'
+    table_rows = []
+
+    for char_id, info in debug_info['files_check'].items():
+        exists_symbol = check_mark if info['exists'] else cross_mark
+        exists_color = 'green' if info['exists'] else 'red'
+        size_text = f"{info.get('size', 'N/A')} bytes"
+
+        row = f"""
+            <tr>
+                <td style="padding: 8px;">{char_id}</td>
+                <td style="padding: 8px; font-family: monospace;">{info['expected_path']}</td>
+                <td style="padding: 8px; color: {exists_color};">{exists_symbol}</td>
+                <td style="padding: 8px;">{size_text}</td>
+                <td style="padding: 8px; font-family: monospace;">{info['url']}</td>
+                <td style="padding: 8px;"><a href="{info['url']}" target="_blank">测试</a></td>
+            </tr>"""
+        table_rows.append(row)
+
+    # 构建测试图片
+    test_images = []
+    for char_id, info in debug_info['files_check'].items():
+        img_tag = f'<img src="{info["url"]}" width="100" height="100" style="margin:5px; border:1px solid #ccc;" alt="{char_id}" onerror="this.style.border=&quot;3px solid red&quot;" onload="this.style.border=&quot;3px solid green&quot;">'
+        test_images.append(img_tag)
+
+    return f"""
+    <html>
+    <head><title>头像调试信息</title></head>
+    <body style="font-family: Arial, sans-serif; padding: 20px;">
+        <h1>头像调试信息</h1>
+        <h2>Flask配置</h2>
+        <p><strong>Static Folder:</strong> {debug_info['static_folder']}</p>
+        <p><strong>Static URL Path:</strong> {debug_info['static_url_path']}</p>
+
+        <h2>目录检查</h2>
+        <ul>
+            <li>static/ 存在: {check_mark if debug_info['directories']['static'] else cross_mark}</li>
+            <li>static/images/ 存在: {check_mark if debug_info['directories']['static/images'] else cross_mark}</li>
+            <li>static/images/characters/ 存在: {check_mark if debug_info['directories']['static/images/characters'] else cross_mark}</li>
+        </ul>
+
+        <h2>文件检查</h2>
+        <table border="1" style="border-collapse: collapse; width: 100%;">
+            <tr style="background: #f0f0f0;">
+                <th style="padding: 8px;">角色ID</th>
+                <th style="padding: 8px;">预期路径</th>
+                <th style="padding: 8px;">文件存在</th>
+                <th style="padding: 8px;">文件大小</th>
+                <th style="padding: 8px;">访问URL</th>
+                <th style="padding: 8px;">测试链接</th>
+            </tr>
+            {''.join(table_rows)}
+        </table>
+
+        <h2>直接测试图片显示</h2>
+        <div style="margin: 20px 0;">
+            {''.join(test_images)}
+        </div>
+
+        <h2>解决方案</h2>
+        <ol>
+            <li>确保 static/images/characters/ 目录存在</li>
+            <li>确保图片文件名与角色ID完全匹配（小写+下划线）</li>
+            <li>确保图片文件为有效的PNG格式</li>
+            <li>检查文件权限，确保Web服务器可以读取</li>
+        </ol>
+
+        <p><a href="/debug/avatar-test" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">完整测试页面</a></p>
+        <p><a href="/" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">返回主页</a></p>
+    </body>
+    </html>
+    """
+
+
+@app.route('/debug/avatar-test')
+def avatar_test():
+    """返回头像测试页面"""
+    html_template = '''<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>头像测试页面</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .test-container { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .avatar-test { display: inline-block; margin: 10px; text-align: center; padding: 15px; border: 1px solid #ddd; border-radius: 8px; width: 150px; }
+        .avatar-test img { width: 100px; height: 100px; border-radius: 50%; border: 2px solid #ccc; object-fit: cover; }
+        .status { margin-top: 10px; padding: 8px; border-radius: 5px; font-size: 12px; font-weight: bold; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .btn { background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 10px; display: inline-block; }
+    </style>
+</head>
+<body>
+    <h1>头像显示测试</h1>
+    <div class="test-container">
+        <h2>静态路径测试</h2>
+        <p>测试所有角色头像是否能正常加载：</p>
+
+        <div class="avatar-test">
+            <img src="/static/images/characters/harry_potter.png" alt="哈利·波特" onload="showStatus(this, 'success')" onerror="showStatus(this, 'error')">
+            <div>哈利·波特</div><div class="status info" id="status_0">检测中...</div>
+        </div>
+        <div class="avatar-test">
+            <img src="/static/images/characters/sherlock_holmes.png" alt="福尔摩斯" onload="showStatus(this, 'success')" onerror="showStatus(this, 'error')">
+            <div>福尔摩斯</div><div class="status info" id="status_1">检测中...</div>
+        </div>
+        <div class="avatar-test">
+            <img src="/static/images/characters/confucius.png" alt="孔子" onload="showStatus(this, 'success')" onerror="showStatus(this, 'error')">
+            <div>孔子</div><div class="status info" id="status_2">检测中...</div>
+        </div>
+        <div class="avatar-test">
+            <img src="/static/images/characters/marie_curie.png" alt="居里夫人" onload="showStatus(this, 'success')" onerror="showStatus(this, 'error')">
+            <div>居里夫人</div><div class="status info" id="status_3">检测中...</div>
+        </div>
+        <div class="avatar-test">
+            <img src="/static/images/characters/sun_wukong.png" alt="孙悟空" onload="showStatus(this, 'success')" onerror="showStatus(this, 'error')">
+            <div>孙悟空</div><div class="status info" id="status_4">检测中...</div>
+        </div>
+        <div class="avatar-test">
+            <img src="/static/images/characters/einstein.png" alt="爱因斯坦" onload="showStatus(this, 'success')" onerror="showStatus(this, 'error')">
+            <div>爱因斯坦</div><div class="status info" id="status_5">检测中...</div>
+        </div>
+        <div class="avatar-test">
+            <img src="/static/images/characters/mulan.png" alt="花木兰" onload="showStatus(this, 'success')" onerror="showStatus(this, 'error')">
+            <div>花木兰</div><div class="status info" id="status_6">检测中...</div>
+        </div>
+        <div class="avatar-test">
+            <img src="/static/images/characters/elizabeth_bennet.png" alt="伊丽莎白" onload="showStatus(this, 'success')" onerror="showStatus(this, 'error')">
+            <div>伊丽莎白</div><div class="status info" id="status_7">检测中...</div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>检查清单</h2>
+        <ul>
+            <li>确保项目根目录下有 static/images/characters/ 文件夹</li>
+            <li>确保图片文件名格式正确（小写+下划线+.png）</li>
+            <li>确保图片文件有效且不损坏</li>
+            <li>确保文件权限允许Web服务器读取</li>
+        </ul>
+
+        <a href="/debug/avatars" class="btn">查看详细调试信息</a>
+        <a href="/" class="btn">返回主页</a>
+    </div>
+
+    <script>
+        function showStatus(img, result) {
+            const index = Array.from(document.querySelectorAll('.avatar-test img')).indexOf(img);
+            const statusEl = document.getElementById('status_' + index);
+            if (result === 'success') {
+                statusEl.textContent = '✓ 加载成功';
+                statusEl.className = 'status success';
+            } else {
+                statusEl.textContent = '✗ 加载失败';
+                statusEl.className = 'status error';
+            }
+        }
+
+        // 3秒后检查还没加载的图片
+        setTimeout(() => {
+            const allStatusElements = document.querySelectorAll('.status.info');
+            allStatusElements.forEach(element => {
+                if (element.textContent === '检测中...') {
+                    element.textContent = '⏱ 加载超时';
+                    element.className = 'status error';
+                }
+            });
+        }, 3000);
+    </script>
+</body>
+</html>'''
+    return html_template
 
 
 # API路由
