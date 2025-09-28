@@ -394,52 +394,80 @@ class VoiceService:
 class ChatService:
     """聊天服务类"""
 
-    def __init__(self, ai_service: AIService):
-        self.character_repo = CharacterRepository()
-        self.chat_repo = ChatRepository()
+    def __init__(self, ai_service: AIService, character_repo: CharacterRepository = None,
+                 chat_repo: ChatRepository = None):
+        # 使用传入的服务实例，而不是重新创建
         self.ai_service = ai_service
+        # 使用传入的仓库实例，如果没有传入则创建新的
+        self.character_repo = character_repo if character_repo is not None else CharacterRepository()
+        self.chat_repo = chat_repo if chat_repo is not None else ChatRepository()
+
+        # 添加调试日志
+        logger.info(f"ChatService 初始化完成")
+        logger.info(f"AI服务配置状态: {self.ai_service.is_configured()}")
+        logger.info(f"角色仓库中的角色数量: {len(self.character_repo.get_all())}")
+        logger.info(f"角色仓库实例: {id(self.character_repo)}")
+        logger.info(f"可用角色: {[c.id for c in self.character_repo.get_all()]}")
 
     def start_chat_session(self, user_id: str, character_id: str) -> Optional[ChatSession]:
         """开始聊天会话"""
-        character = self.character_repo.get_by_id(character_id)
-        if not character:
+        try:
+            logger.info(f"开始创建聊天会话 - 用户: {user_id}, 角色: {character_id}")
+
+            # 获取角色
+            character = self.character_repo.get_by_id(character_id)
+            if not character:
+                logger.error(f"角色不存在: {character_id}")
+                logger.error(f"可用角色: {[c.id for c in self.character_repo.get_all()]}")
+                return None
+
+            logger.info(f"找到角色: {character.name} ({character.id})")
+
+            # 创建新会话
+            session = self.chat_repo.create_session(user_id, character_id)
+            logger.info(f"会话已创建: {session.id}")
+
+            # 添加角色的问候消息
+            greeting_msg = Message.create_character_message(
+                character.greeting,
+                metadata={'ai_generated': False}
+            )
+            session.add_message(greeting_msg)
+            logger.info(f"问候消息已添加: {character.greeting[:50]}...")
+
+            return session
+
+        except Exception as e:
+            logger.error(f"创建聊天会话时出错: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
-
-        # 创建新会话
-        session = self.chat_repo.create_session(user_id, character_id)
-
-        # 添加角色的问候消息
-        greeting_msg = Message.create_character_message(
-            character.greeting,
-            metadata={'ai_generated': False}
-        )
-        session.add_message(greeting_msg)
-
-        return session
 
     def send_message(self, session_id: str, user_message: str, is_voice_call: bool = False) -> Optional[str]:
         """发送消息并获取回复"""
-        session = self.chat_repo.get_session(session_id)
-        if not session:
-            return None
-
-        character = self.character_repo.get_by_id(session.character_id)
-        if not character:
-            return None
-
-        # 检查消息长度
-        if len(user_message) > Config.MAX_MESSAGE_LENGTH:
-            return f"消息太长了，请限制在{Config.MAX_MESSAGE_LENGTH}字以内"
-
-        # 添加用户消息
-        user_msg = Message.create_user_message(user_message)
-        session.add_message(user_msg)
-
-        # 获取上下文消息
-        context_messages = session.get_context_messages()
-
-        # 生成AI回复
         try:
+            session = self.chat_repo.get_session(session_id)
+            if not session:
+                logger.error(f"会话不存在: {session_id}")
+                return None
+
+            character = self.character_repo.get_by_id(session.character_id)
+            if not character:
+                logger.error(f"角色不存在: {session.character_id}")
+                return None
+
+            # 检查消息长度
+            if len(user_message) > Config.MAX_MESSAGE_LENGTH:
+                return f"消息太长了，请限制在{Config.MAX_MESSAGE_LENGTH}字以内"
+
+            # 添加用户消息
+            user_msg = Message.create_user_message(user_message)
+            session.add_message(user_msg)
+
+            # 获取上下文消息
+            context_messages = session.get_context_messages()
+
+            # 生成AI回复
             ai_response = self.ai_service.generate_response(
                 character, user_message, context_messages[:-1], is_voice_call  # 不包括刚添加的用户消息
             )
@@ -459,47 +487,56 @@ class ChatService:
             return ai_response
 
         except Exception as e:
-            logger.error(f"生成回复失败: {str(e)}")
+            logger.error(f"发送消息时出错: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+            # 返回错误消息而不是 None
             error_msg = "抱歉，我现在有点困惑。让我们换个话题吧？"
 
-            # 添加错误回复
-            error_msg_obj = Message.create_character_message(
-                error_msg,
-                metadata={'error': str(e), 'ai_generated': True}
-            )
-            session.add_message(error_msg_obj)
+            # 尝试添加错误回复到会话中
+            try:
+                session = self.chat_repo.get_session(session_id)
+                if session:
+                    error_msg_obj = Message.create_character_message(
+                        error_msg,
+                        metadata={'error': str(e), 'ai_generated': True}
+                    )
+                    session.add_message(error_msg_obj)
+            except:
+                pass  # 如果添加错误消息也失败，就忽略
 
             return error_msg
 
     def send_message_stream(self, session_id: str, user_message: str, is_voice_call: bool = False) -> Generator[
         str, None, None]:
         """流式发送消息"""
-        session = self.chat_repo.get_session(session_id)
-        if not session:
-            yield "会话不存在"
-            return
-
-        character = self.character_repo.get_by_id(session.character_id)
-        if not character:
-            yield "角色不存在"
-            return
-
-        # 检查消息长度
-        if len(user_message) > Config.MAX_MESSAGE_LENGTH:
-            yield f"消息太长了，请限制在{Config.MAX_MESSAGE_LENGTH}字以内"
-            return
-
-        # 添加用户消息
-        user_msg = Message.create_user_message(user_message)
-        session.add_message(user_msg)
-
-        # 获取上下文
-        context_messages = session.get_context_messages()
-
-        # 收集完整响应
-        full_response = ""
-
         try:
+            session = self.chat_repo.get_session(session_id)
+            if not session:
+                yield "会话不存在"
+                return
+
+            character = self.character_repo.get_by_id(session.character_id)
+            if not character:
+                yield "角色不存在"
+                return
+
+            # 检查消息长度
+            if len(user_message) > Config.MAX_MESSAGE_LENGTH:
+                yield f"消息太长了，请限制在{Config.MAX_MESSAGE_LENGTH}字以内"
+                return
+
+            # 添加用户消息
+            user_msg = Message.create_user_message(user_message)
+            session.add_message(user_msg)
+
+            # 获取上下文
+            context_messages = session.get_context_messages()
+
+            # 收集完整响应
+            full_response = ""
+
             # 流式生成回复
             for chunk in self.ai_service.generate_response_stream(
                     character, user_message, context_messages[:-1], is_voice_call
@@ -526,11 +563,16 @@ class ChatService:
             yield error_msg
 
             # 保存错误消息
-            error_msg_obj = Message.create_character_message(
-                full_response + error_msg if full_response else error_msg,
-                metadata={'error': str(e), 'ai_generated': True}
-            )
-            session.add_message(error_msg_obj)
+            try:
+                session = self.chat_repo.get_session(session_id)
+                if session:
+                    error_msg_obj = Message.create_character_message(
+                        full_response + error_msg if 'full_response' in locals() and full_response else error_msg,
+                        metadata={'error': str(e), 'ai_generated': True}
+                    )
+                    session.add_message(error_msg_obj)
+            except:
+                pass
 
     def get_chat_history(self, session_id: str) -> List[Message]:
         """获取聊天历史"""
