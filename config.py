@@ -1,148 +1,201 @@
 import os
-from datetime import timedelta
+from typing import Dict, List, Optional
 
 
 class Config:
     """应用配置类"""
-    # Flask配置
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'ai-roleplay-secret-key-2024-enhanced'
-    DEBUG = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
 
-    # Session配置
-    PERMANENT_SESSION_LIFETIME = timedelta(days=30)
-    SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SECURE = False  # 开发环境设为False
+    # Flask 基础配置
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'your-secret-key-here-change-in-production'
+    DEBUG = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
 
     # 文件上传配置
+    UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', 'uploads')
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
-    UPLOAD_FOLDER = 'uploads'
-    ALLOWED_AUDIO_EXTENSIONS = {'wav', 'mp3', 'webm', 'ogg', 'm4a'}
 
-    # AI模型配置 - 使用OpenAI兼容API
-    AI_MODEL_PROVIDER = os.environ.get('AI_MODEL_PROVIDER', 'openai')
+    # AI 服务配置 - 兼容两种环境变量命名
+    AI_MODEL_PROVIDER = os.environ.get('AI_MODEL_PROVIDER') or os.environ.get('AI_PROVIDER', 'openai')
+    AI_API_KEY = os.environ.get('AI_API_KEY') or os.environ.get('OPENAI_API_KEY', '')
+    AI_API_BASE = os.environ.get('AI_API_BASE') or os.environ.get('OPENAI_API_BASE', 'https://api.openai.com/v1')
+    AI_MODEL = os.environ.get('AI_MODEL') or os.environ.get('OPENAI_MODEL', 'gpt-3.5-turbo')
 
-    # OpenAI兼容API配置
-    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
-    OPENAI_API_BASE = os.environ.get('OPENAI_API_BASE', 'https://openai.qinlu.com/v1')
-    OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'x-ai/grok-4-fast')
+    # AI 参数配置
+    DEFAULT_TEMPERATURE = float(os.environ.get('AI_TEMPERATURE', '0.7'))
+    DEFAULT_MAX_TOKENS = int(os.environ.get('AI_MAX_TOKENS', '1000'))
+    DEFAULT_TOP_P = float(os.environ.get('AI_TOP_P', '1.0'))
+    DEFAULT_FREQUENCY_PENALTY = float(os.environ.get('AI_FREQUENCY_PENALTY', '0.0'))
+    DEFAULT_PRESENCE_PENALTY = float(os.environ.get('AI_PRESENCE_PENALTY', '0.0'))
 
-    # AI生成配置
-    AI_TEMPERATURE = float(os.environ.get('AI_TEMPERATURE', '0.8'))
-    AI_MAX_TOKENS = int(os.environ.get('AI_MAX_TOKENS', '800'))
-    AI_TOP_P = float(os.environ.get('AI_TOP_P', '0.9'))
-    AI_FREQUENCY_PENALTY = float(os.environ.get('AI_FREQUENCY_PENALTY', '0.5'))
-    AI_PRESENCE_PENALTY = float(os.environ.get('AI_PRESENCE_PENALTY', '0.5'))
-
-    # 语音通话专用配置
-    VOICE_CALL_TEMPERATURE = float(os.environ.get('VOICE_CALL_TEMPERATURE', '0.7'))
-    VOICE_CALL_MAX_TOKENS = int(os.environ.get('VOICE_CALL_MAX_TOKENS', '150'))  # 限制更短
-    VOICE_CALL_FREQUENCY_PENALTY = float(os.environ.get('VOICE_CALL_FREQUENCY_PENALTY', '0.8'))  # 避免重复
+    # 语音通话专用参数
+    VOICE_CALL_TEMPERATURE = float(os.environ.get('VOICE_CALL_TEMPERATURE', '0.6'))
+    VOICE_CALL_MAX_TOKENS = int(os.environ.get('VOICE_CALL_MAX_TOKENS', '150'))
+    VOICE_CALL_FREQUENCY_PENALTY = float(os.environ.get('VOICE_CALL_FREQUENCY_PENALTY', '0.3'))
 
     # 语音服务配置
     VOICE_SERVICE_PROVIDER = os.environ.get('VOICE_SERVICE_PROVIDER', 'browser')
 
-    # Azure语音服务配置（可选）
-    AZURE_SPEECH_KEY = os.environ.get('AZURE_SPEECH_KEY')
-    AZURE_SPEECH_REGION = os.environ.get('AZURE_SPEECH_REGION', 'eastasia')
+    # 对话限制
+    MAX_CONVERSATION_LENGTH = int(os.environ.get('MAX_CONVERSATION_LENGTH', '20'))
+    MAX_MESSAGE_LENGTH = int(os.environ.get('MAX_MESSAGE_LENGTH', '1000'))
 
-    # Google语音服务配置（可选）
-    GOOGLE_CLOUD_CREDENTIALS = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+    # 超时设置 - 针对不同网络环境调整
+    RESPONSE_TIMEOUT = int(os.environ.get('RESPONSE_TIMEOUT', '60'))
+    CONNECTION_TIMEOUT = int(os.environ.get('CONNECTION_TIMEOUT', '10'))
 
-    # 缓存配置
-    CACHE_TYPE = 'simple'
-    CACHE_DEFAULT_TIMEOUT = 300
+    # 重试配置
+    MAX_RETRIES = int(os.environ.get('MAX_RETRIES', '3'))
+    RETRY_DELAY = int(os.environ.get('RETRY_DELAY', '2'))
 
-    # 速率限制
-    RATELIMIT_ENABLED = True
-    RATELIMIT_DEFAULT = "100/hour"
-    RATELIMIT_CHAT = "30/minute"
+    # 数据库配置 (如果将来需要)
+    DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
-    # 日志配置
+    # Redis 配置 (如果将来需要缓存)
+    REDIS_URL = os.environ.get('REDIS_URL', '')
+
+    # 日志级别
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
-    LOG_FILE = os.environ.get('LOG_FILE', 'app.log')
-
-    # 性能优化配置
-    RESPONSE_TIMEOUT = int(os.environ.get('RESPONSE_TIMEOUT', '30'))
-    MAX_CONVERSATION_LENGTH = int(os.environ.get('MAX_CONVERSATION_LENGTH', '50'))
-    MAX_MESSAGE_LENGTH = int(os.environ.get('MAX_MESSAGE_LENGTH', '2000'))
-
-    # 数据库配置（未来扩展）
-    DATABASE_URI = os.environ.get('DATABASE_URI', 'sqlite:///roleplay.db')
+    LOG_FILE = os.environ.get('LOG_FILE', '')
 
     @classmethod
-    def get_ai_config(cls, provider=None):
-        """获取特定AI服务商的配置"""
-        provider = provider or cls.AI_MODEL_PROVIDER
-
-        configs = {
-            'openai': {
-                'api_key': cls.OPENAI_API_KEY,
-                'api_base': cls.OPENAI_API_BASE,
-                'model': cls.OPENAI_MODEL,
-                'temperature': cls.AI_TEMPERATURE,
-                'max_tokens': cls.AI_MAX_TOKENS,
-                'top_p': cls.AI_TOP_P,
-                'frequency_penalty': cls.AI_FREQUENCY_PENALTY,
-                'presence_penalty': cls.AI_PRESENCE_PENALTY
-            }
+    def get_ai_config(cls) -> Dict:
+        """获取AI服务配置"""
+        return {
+            'provider': cls.AI_MODEL_PROVIDER,
+            'api_key': cls.AI_API_KEY,
+            'api_base': cls.AI_API_BASE,
+            'model': cls.AI_MODEL,
+            'temperature': cls.DEFAULT_TEMPERATURE,
+            'max_tokens': cls.DEFAULT_MAX_TOKENS,
+            'top_p': cls.DEFAULT_TOP_P,
+            'frequency_penalty': cls.DEFAULT_FREQUENCY_PENALTY,
+            'presence_penalty': cls.DEFAULT_PRESENCE_PENALTY,
         }
 
-        return configs.get(provider, configs['openai'])
+    @classmethod
+    def get_voice_config(cls) -> Dict:
+        """获取语音服务配置"""
+        return {
+            'provider': cls.VOICE_SERVICE_PROVIDER,
+        }
 
     @classmethod
-    def validate_config(cls):
-        """验证配置的完整性"""
+    def validate_config(cls) -> List[str]:
+        """验证配置，返回错误列表"""
         errors = []
 
-        # 检查OpenAI兼容API配置
-        if cls.AI_MODEL_PROVIDER == 'openai':
-            if not cls.OPENAI_API_KEY:
-                errors.append("API密钥未配置")
-            elif not cls.OPENAI_API_KEY.startswith('sk-'):
-                errors.append("API密钥格式不正确（应以sk-开头）")
+        # 检查AI服务配置
+        if not cls.AI_API_KEY:
+            errors.append("AI_API_KEY 或 OPENAI_API_KEY 未设置")
 
-            if not cls.OPENAI_API_BASE:
-                errors.append("API基础URL未配置")
-            elif not cls.OPENAI_API_BASE.startswith('http'):
-                errors.append("API基础URL格式不正确")
+        if not cls.AI_API_BASE:
+            errors.append("AI_API_BASE 或 OPENAI_API_BASE 未设置")
 
-            if not cls.OPENAI_MODEL:
-                errors.append("模型名称未配置")
+        if not cls.AI_MODEL:
+            errors.append("AI_MODEL 或 OPENAI_MODEL 未设置")
 
-        # 检查语音服务配置
-        if cls.VOICE_SERVICE_PROVIDER == 'azure' and not cls.AZURE_SPEECH_KEY:
-            errors.append("Azure语音服务密钥未配置")
-        elif cls.VOICE_SERVICE_PROVIDER == 'google' and not cls.GOOGLE_CLOUD_CREDENTIALS:
-            errors.append("Google Cloud凭证未配置")
+        # 检查参数范围
+        if not (0.0 <= cls.DEFAULT_TEMPERATURE <= 2.0):
+            errors.append("AI_TEMPERATURE 应在 0.0-2.0 范围内")
+
+        if cls.DEFAULT_MAX_TOKENS <= 0:
+            errors.append("AI_MAX_TOKENS 应大于 0")
+
+        if not (0.0 <= cls.DEFAULT_TOP_P <= 1.0):
+            errors.append("AI_TOP_P 应在 0.0-1.0 范围内")
+
+        # 检查语音通话参数
+        if not (0.0 <= cls.VOICE_CALL_TEMPERATURE <= 2.0):
+            errors.append("VOICE_CALL_TEMPERATURE 应在 0.0-2.0 范围内")
+
+        if cls.VOICE_CALL_MAX_TOKENS <= 0:
+            errors.append("VOICE_CALL_MAX_TOKENS 应大于 0")
 
         return errors
 
     @classmethod
-    def get_model_info(cls):
-        """获取模型信息"""
-        model_info = {
-            'x-ai/grok-4-fast': {
-                'name': 'Grok-4-Fast',
-                'description': '快速响应的Grok模型',
-                'max_tokens': 4096,
-                'supports_stream': True
+    def is_production(cls) -> bool:
+        """检查是否为生产环境"""
+        return os.environ.get('FLASK_ENV') == 'production'
+
+    @classmethod
+    def get_supported_providers(cls) -> Dict[str, Dict]:
+        """获取支持的服务提供商"""
+        return {
+            'ai_providers': {
+                'openai': {
+                    'name': 'OpenAI',
+                    'api_base': 'https://api.openai.com/v1',
+                    'models': ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo']
+                },
+                'azure': {
+                    'name': 'Azure OpenAI',
+                    'api_base': 'https://your-resource.openai.azure.com',
+                    'models': ['gpt-4', 'gpt-35-turbo']
+                },
+                'anthropic': {
+                    'name': 'Anthropic',
+                    'api_base': 'https://api.anthropic.com',
+                    'models': ['claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku']
+                },
+                'x-ai': {
+                    'name': 'xAI',
+                    'api_base': 'https://api.x.ai/v1',
+                    'models': ['grok-4-fast', 'grok-beta']
+                },
+                'qiniu': {
+                    'name': '七牛云OpenAI兼容服务',
+                    'api_base': 'https://openai.qiniu.com/v1',
+                    'models': ['x-ai/grok-4-fast', 'gpt-4', 'gpt-3.5-turbo']
+                }
             },
-            'gpt-4': {
-                'name': 'GPT-4',
-                'description': 'OpenAI GPT-4模型',
-                'max_tokens': 8192,
-                'supports_stream': True
-            },
-            'gpt-3.5-turbo': {
-                'name': 'GPT-3.5 Turbo',
-                'description': 'OpenAI GPT-3.5 Turbo模型',
-                'max_tokens': 4096,
-                'supports_stream': True
+            'voice_providers': {
+                'browser': {
+                    'name': '浏览器内置语音',
+                    'description': '使用浏览器的Web Speech API'
+                },
+                'openai': {
+                    'name': 'OpenAI TTS',
+                    'description': 'OpenAI的文字转语音服务'
+                },
+                'azure': {
+                    'name': 'Azure Speech',
+                    'description': 'Azure认知服务语音'
+                }
             }
         }
-        return model_info.get(cls.OPENAI_MODEL, {
-            'name': cls.OPENAI_MODEL,
-            'description': '自定义模型',
-            'max_tokens': 4096,
-            'supports_stream': True
-        })
+
+
+class DevelopmentConfig(Config):
+    """开发环境配置"""
+    DEBUG = True
+    LOG_LEVEL = 'DEBUG'
+
+
+class ProductionConfig(Config):
+    """生产环境配置"""
+    DEBUG = False
+    LOG_LEVEL = 'WARNING'
+
+    # 生产环境的安全配置
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+
+
+class TestingConfig(Config):
+    """测试环境配置"""
+    TESTING = True
+    DEBUG = True
+    LOG_LEVEL = 'DEBUG'
+
+    # 测试环境使用内存数据库
+    DATABASE_URL = 'sqlite:///:memory:'
+
+
+# 配置字典
+config = {
+    'development': DevelopmentConfig,
+    'production': ProductionConfig,
+    'testing': TestingConfig,
+    'default': DevelopmentConfig
+}
