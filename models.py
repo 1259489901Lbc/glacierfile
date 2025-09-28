@@ -304,6 +304,57 @@ class CharacterRepository:
             )
         }
 
+    def delete_character(self, character_id: str) -> bool:
+        """删除角色"""
+        if character_id in self.characters:
+            del self.characters[character_id]
+            return True
+        return False
+
+    def update_character(self, character_id: str, character_data: Dict) -> bool:
+        """更新角色信息"""
+        if character_id not in self.characters:
+            return False
+
+        character = self.characters[character_id]
+
+        # 更新允许修改的字段
+        if 'name' in character_data:
+            character.name = character_data['name']
+        if 'description' in character_data:
+            character.description = character_data['description']
+        if 'personality' in character_data:
+            character.personality = character_data['personality']
+        if 'background' in character_data:
+            character.background = character_data['background']
+        if 'category' in character_data:
+            character.category = character_data['category']
+        if 'greeting' in character_data:
+            character.greeting = character_data['greeting']
+        if 'skills' in character_data:
+            character.skills = character_data['skills']
+        if 'avatar' in character_data:
+            character.avatar = character_data['avatar']
+
+        return True
+
+    def create_character_from_dict(self, character_data: Dict) -> Character:
+        """从字典创建角色"""
+        return Character(
+            id=character_data.get('id', str(uuid.uuid4())),
+            name=character_data['name'],
+            description=character_data['description'],
+            personality=character_data['personality'],
+            background=character_data['background'],
+            avatar=character_data.get('avatar', '/static/images/characters/default.png'),
+            category=character_data['category'],
+            greeting=character_data['greeting'],
+            skills=character_data.get('skills', []),
+            voice_config=character_data.get('voice_config', {}),
+            chat_examples=character_data.get('chat_examples', []),
+            temperature_modifier=character_data.get('temperature_modifier', 0.0)
+        )
+
     def get_all(self) -> List[Character]:
         return list(self.characters.values())
 
